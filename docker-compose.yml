@@ -1,0 +1,72 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: omega-backend
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      JWT_SECRET: change-me-to-a-long-random-string
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 4s
+      retries: 5
+      start_period: 5s
+    networks:
+      - omega
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    container_name: omega-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    restart: unless-stopped
+    networks:
+      - omega
+
+  # ---------------------------------------------------------------------------
+  # Mobile (Expo) — defaults to WEB mode so anyone can open the app in their
+  # browser at http://localhost:19006 with zero extra setup.
+  #
+  # For a "real device" demo, run instead:
+  #   docker compose -f docker-compose.yml -f docker-compose.mobile-lan.yml up
+  # which switches the CMD to LAN mode and uses your host's LAN IP.
+  # ---------------------------------------------------------------------------
+  mobile:
+    build:
+      context: ./mobile
+    container_name: omega-mobile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "19006:19006"   # Expo Web
+      - "8081:8081"     # Metro bundler (only useful in LAN mode)
+      - "19000:19000"   # Expo Go (LAN mode)
+      - "19001:19001"
+      - "19002:19002"
+    environment:
+      # Vars prefixed with EXPO_PUBLIC_ are inlined into the bundle at start
+      EXPO_PUBLIC_API_URL: http://localhost:4000
+    restart: unless-stopped
+    networks:
+      - omega
+
+networks:
+  omega:
+    driver: bridge

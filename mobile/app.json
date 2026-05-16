@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "OMEGA",
+    "slug": "omega-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "omega",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0e7490"
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "mu.omega.app" },
+    "android": {
+      "adaptiveIcon": { "backgroundColor": "#0e7490" },
+      "package": "mu.omega.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": []
+  }
+}

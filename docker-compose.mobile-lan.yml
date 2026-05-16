@@ -1,0 +1,23 @@
+# Override file: switches mobile container to LAN mode so Expo Go on a real
+# phone can connect.
+#
+# Usage:
+#   1. Find your computer's LAN IP (the one your phone sees on the same Wi-Fi).
+#        macOS / Linux:  ipconfig getifaddr en0   |   ip addr show
+#        Windows:        ipconfig | findstr IPv4
+#   2. Export it (or create a .env at the repo root) :
+#        export HOST_LAN_IP=192.168.1.42
+#   3. Launch :
+#        docker compose -f docker-compose.yml -f docker-compose.mobile-lan.yml up --build
+#   4. Open Expo Go on your phone (same Wi-Fi), scan the QR printed in the
+#      mobile container logs. The phone will hit the backend at
+#      http://$HOST_LAN_IP:4000 — no source edits needed.
+
+services:
+  mobile:
+    environment:
+      # Tells Expo to advertise this IP in the bundle URL it prints
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_LAN_IP:?Set HOST_LAN_IP to your LAN IP, e.g. export HOST_LAN_IP=192.168.1.42}
+      # Phone reaches the backend through your host's LAN IP
+      EXPO_PUBLIC_API_URL: http://${HOST_LAN_IP}:4000
+    command: ["npx", "expo", "start", "--lan"]
