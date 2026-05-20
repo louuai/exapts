@@ -18,7 +18,7 @@ export default function LeadCaptureModal({ open, onClose, interest = 'real-estat
     setLoading(true);
     setError(null);
     try {
-      await api.createLead({ ...form, interest, source });
+      await api.createLead({ ...form, type: 'general', interest, source });
       setDone(true);
     } catch (err) {
       setError(err.message);

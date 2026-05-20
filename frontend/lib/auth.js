@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from './api';
+import { getSocket, disconnectSocket } from './socket';
 
 const AuthContext = createContext({
   user: null,
@@ -22,7 +23,10 @@ export function AuthProvider({ children }) {
     }
     api
       .me()
-      .then((data) => setUser(data.user))
+      .then((data) => {
+        setUser(data.user);
+        getSocket(); // restore WS for already-signed-in sessions
+      })
       .catch(() => {
         window.localStorage.removeItem('omega.token');
         setUser(null);
@@ -34,6 +38,7 @@ export function AuthProvider({ children }) {
     const data = await api.login({ email, password });
     window.localStorage.setItem('omega.token', data.token);
     setUser(data.user);
+    setTimeout(() => getSocket(), 0); // open the WS after token is persisted
     return data.user;
   }, []);
 
@@ -41,11 +46,13 @@ export function AuthProvider({ children }) {
     const data = await api.signup(payload);
     window.localStorage.setItem('omega.token', data.token);
     setUser(data.user);
+    setTimeout(() => getSocket(), 0);
     return data.user;
   }, []);
 
   const logout = useCallback(() => {
     window.localStorage.removeItem('omega.token');
+    disconnectSocket();
     setUser(null);
   }, []);
 

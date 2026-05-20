@@ -1,0 +1,445 @@
+// OMEGA — production schema (Postgres + Prisma)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================================
+// USERS
+// =========================================================================
+
+enum Role {
+  user
+  admin
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  avatar        String?
+  bio           String?
+  location      String?
+  role          Role     @default(user)
+  notificationPrefs Json @default("{\"newProperties\":true,\"communityReplies\":true,\"weeklyDigest\":false}")
+
+  // Auth hardening
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  reposts       Repost[]
+
+  followers     Follow[] @relation("UserFollowers")    // people who follow this user
+  following     Follow[] @relation("UserFollowing")    // people this user follows
+
+  favorites     Favorite[]
+  visitRequests VisitRequest[]
+  inquiries     Inquiry[]
+
+  // Chat
+  conversationsA Conversation[] @relation("ConversationUserA")
+  conversationsB Conversation[] @relation("ConversationUserB")
+  chatMessages   ChatMessage[]
+
+  notifications  Notification[]
+
+  @@index([role])
+}
+
+// =========================================================================
+// PROPERTIES
+// =========================================================================
+
+enum Transaction {
+  sale
+  rent
+}
+
+model Property {
+  id              String   @id @default(cuid())
+  reference       String?  @unique
+  title           String
+  titleEn         String?
+  type            String
+  transaction     Transaction
+  price           Int
+  currency        String   @default("EUR")
+  location        String
+  region          String?
+  coordinates     Json?
+  surface         Int      @default(0)
+  landSurface     Int?
+  rooms           Int      @default(0)
+  bedrooms        Int      @default(0)
+  bathrooms       Int      @default(0)
+  parking         Int      @default(0)
+  yearBuilt       Int?
+  eligibility     String?
+  eligibilityEn   String?
+  description     String?
+  descriptionEn   String?
+  images          Json     @default("[]")    // string[]
+  features        Json     @default("[]")    // string[]
+  tags            Json     @default("[]")    // string[]  e.g. "Expat Opportunity"
+  agent           Json?    // { name, agency, phone, avatar }
+  featured        Boolean  @default(false)
+  new             Boolean  @default(true)
+  listedAt        DateTime @default(now())
+
+  // Admin-only
+  sourceUrl       String?  // Original listing URL (admin-only)
+  internalNotes   String?  // Private admin notes
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  favorites       Favorite[]
+  visitRequests   VisitRequest[]
+  inquiries       Inquiry[]
+  leads           Lead[]
+
+  @@index([transaction])
+  @@index([region])
+  @@index([featured])
+  @@index([listedAt])
+}
+
+// =========================================================================
+// SERVICES (Annuaire)
+// =========================================================================
+
+enum Subscription {
+  standard
+  premium
+}
+
+model Service {
+  id            String       @id @default(cuid())
+  name          String
+  category      String
+  description   String?
+  location      String?
+  contact       Json         @default("{}")  // { phone, email, website }
+  rating        Float        @default(0)
+  reviews       Int          @default(0)
+  subscription  Subscription @default(standard)
+  image         String?
+  // Admin-only
+  sourceUrl     String?
+  internalNotes String?
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  leads         Lead[]
+
+  @@index([category])
+  @@index([subscription])
+}
+
+// =========================================================================
+// GUIDES
+// =========================================================================
+
+model Guide {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  titleEn       String?
+  category      String?
+  icon          String?
+  color         String?
+  coverImage    String?
+  description   String?
+  descriptionEn String?
+  readTime      Int      @default(5)
+  steps         Json     @default("[]")    // [{ title, body }]
+  tips          Json     @default("[]")    // string[]
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+// =========================================================================
+// SOCIAL — Posts, Comments, Likes, Reposts, Follow
+// =========================================================================
+
+model Post {
+  id          String    @id @default(cuid())
+  authorId    String
+  content     String
+  image       String?   // data URL or remote URL
+  tag         String    @default("Général")
+  editedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  likes       Like[]
+  reposts     Repost[]  @relation("OriginalPost")
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  postId     String
+  authorId   String
+  content    String
+  parentId   String?  // for shallow nesting (1 level)
+  createdAt  DateTime @default(now())
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent     Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies    Comment[] @relation("CommentReplies")
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model Repost {
+  id              String   @id @default(cuid())
+  originalPostId  String
+  userId          String
+  commentary      String?
+  createdAt       DateTime @default(now())
+
+  originalPost    Post     @relation("OriginalPost", fields: [originalPostId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([originalPostId, userId])
+  @@index([userId])
+}
+
+model Follow {
+  id           String   @id @default(cuid())
+  followerId   String   // the one doing the following
+  followingId  String   // the one being followed
+  createdAt    DateTime @default(now())
+
+  follower     User     @relation("UserFollowing", fields: [followerId],  references: [id], onDelete: Cascade)
+  following    User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// =========================================================================
+// FAVORITES
+// =========================================================================
+
+model Favorite {
+  id          String   @id @default(cuid())
+  userId      String
+  propertyId  String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+}
+
+// =========================================================================
+// BUSINESS — Leads, Visit Requests, Inquiries
+// =========================================================================
+
+enum LeadStatus {
+  new
+  contacted
+  converted
+  closed
+}
+
+enum LeadType {
+  property
+  service
+  general
+}
+
+model Lead {
+  id          String     @id @default(cuid())
+  type        LeadType   @default(general)
+  propertyId  String?
+  serviceId   String?
+  name        String
+  email       String
+  phone       String?
+  message     String?
+  source      String     @default("landing")  // landing-modal, landing-section, service-directory, …
+  interest    String     @default("real-estate")  // legacy tag (kept for back-compat / "service:<id>")
+  status      LeadStatus @default(new)
+  notes       String?    // admin-only
+  createdAt   DateTime   @default(now())
+
+  property    Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  service     Service?   @relation(fields: [serviceId],  references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([type])
+  @@index([propertyId])
+  @@index([serviceId])
+  @@index([createdAt])
+}
+
+enum VisitStatus {
+  pending
+  confirmed
+  done
+  cancelled
+}
+
+model VisitRequest {
+  id             String      @id @default(cuid())
+  propertyId     String
+  userId         String?
+  userName       String
+  userEmail      String
+  userPhone      String?
+  preferredDate  String?
+  message        String?
+  status         VisitStatus @default(pending)
+  notes          String?     // admin-only
+  createdAt      DateTime    @default(now())
+
+  property       Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user           User?       @relation(fields: [userId],     references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+enum InquiryStatus {
+  open
+  answered
+  closed
+}
+
+model Inquiry {
+  id          String        @id @default(cuid())
+  propertyId  String
+  userId      String?
+  userName    String
+  userEmail   String
+  body        String
+  status      InquiryStatus @default(open)
+  createdAt   DateTime      @default(now())
+
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user        User?         @relation(fields: [userId],     references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+// =========================================================================
+// REAL-TIME CHAT
+// =========================================================================
+
+model Conversation {
+  id            String        @id @default(cuid())
+  // Always normalize so userAId < userBId (alphabetic) → unique 1:1
+  userAId       String
+  userBId       String
+  lastMessageAt DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  userA         User          @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User          @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages      ChatMessage[]
+
+  @@unique([userAId, userBId])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  editedAt       DateTime?    // set when sender edits the message
+  deletedAt      DateTime?    // soft-delete — UI shows "Message supprimé"
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId],       references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// =========================================================================
+// NOTIFICATIONS
+// =========================================================================
+
+enum NotificationType {
+  NEW_FOLLOWER
+  NEW_COMMENT
+  NEW_LIKE
+  NEW_REPOST
+  NEW_MESSAGE
+  NEW_LEAD
+  NEW_VISIT_REQUEST
+  NEW_PROPERTY     // for users who opted in
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           // recipient
+  type      NotificationType
+   read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+}
+
+// =========================================================================
+// ADMIN ACTIVITY LOG — audit trail for sensitive admin actions
+// =========================================================================
+
+model AdminLog {
+  id          String   @id @default(cuid())
+  actorId     String   // admin who performed the action
+  actorEmail  String   // denormalised for fast display
+  action      String   // e.g. "property.create", "lead.delete", "service.update"
+  targetType  String?  // "property" | "service" | "user" | "lead" | ...
+  targetId    String?
+  ip          String?
+  userAgent   String?
+  payload     Json?    // sanitised summary of the change
+  createdAt   DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
+}

@@ -1,21 +1,29 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Heart, BedDouble, Bath, Maximize, MapPin } from 'lucide-react';
+import { Heart, BedDouble, Bath, Maximize, MapPin, Phone, Calendar, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn, formatPrice } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import Badge from '@/components/ui/Badge';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import PropertyLeadModal from '@/components/feature/PropertyLeadModal';
 
 export default function PropertyCard({ property, isFavorite: initialFav = false, onToggleFavorite }) {
   const { locale, t } = useI18n();
   const { user } = useAuth();
   const [imgIdx, setImgIdx] = useState(0);
   const [fav, setFav] = useState(initialFav);
+  const [leadModal, setLeadModal] = useState(null); // null | 'contact' | 'visit'
 
   const title = locale === 'en' && property.titleEn ? property.titleEn : property.title;
+
+  function openLead(e, mode) {
+    e.preventDefault();
+    e.stopPropagation();
+    setLeadModal(mode);
+  }
 
   async function handleFav(e) {
     e.preventDefault();
@@ -45,9 +53,10 @@ export default function PropertyCard({ property, isFavorite: initialFav = false,
       transition={{ duration: 0.35, ease: 'easeOut' }}
       className="group"
     >
+      <div className="rounded-2xl bg-white border border-ink-100 shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col">
       <Link
         href={`/properties/${property.id}`}
-        className="block rounded-2xl bg-white border border-ink-100 shadow-soft hover:shadow-card transition-all overflow-hidden"
+        className="block"
       >
         {/* Image area */}
         <div className="relative h-60 overflow-hidden bg-ink-100">
@@ -84,7 +93,13 @@ export default function PropertyCard({ property, isFavorite: initialFav = false,
           )}
 
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex gap-2">
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[calc(100%-3.5rem)]">
+            {Array.isArray(property.tags) && property.tags.includes('Expat Opportunity') && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 text-amber-950 px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase shadow-soft">
+                <Star className="h-3 w-3 fill-amber-950" />
+                Expat Opportunity
+              </span>
+            )}
             {property.new && <Badge tone="brand">{t('properties.new')}</Badge>}
             {property.featured && (
               <Badge tone="white">{t('properties.featured')}</Badge>
@@ -147,6 +162,32 @@ export default function PropertyCard({ property, isFavorite: initialFav = false,
           </div>
         </div>
       </Link>
+
+      {/* Action row — Contact + Request Visit (creates Lead with type=property) */}
+      <div className="px-4 pb-4 mt-auto flex gap-2">
+        <button
+          onClick={(e) => openLead(e, 'contact')}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-ink-700 border border-ink-200 bg-white hover:bg-ink-50 transition"
+        >
+          <Phone className="h-3.5 w-3.5" />
+          Contact
+        </button>
+        <button
+          onClick={(e) => openLead(e, 'visit')}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white bg-ink-900 hover:bg-ink-800 transition"
+        >
+          <Calendar className="h-3.5 w-3.5" />
+          Demander une visite
+        </button>
+      </div>
+      </div>
+
+      <PropertyLeadModal
+        open={!!leadModal}
+        onClose={() => setLeadModal(null)}
+        property={property}
+        mode={leadModal || 'contact'}
+      />
     </motion.div>
   );
 }

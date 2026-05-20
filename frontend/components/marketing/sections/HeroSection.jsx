@@ -1,16 +1,36 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, Building2, BookOpen, Users, MapPin, Heart, BedDouble, Bath, Maximize, Gift } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import LeadCaptureModal from '@/components/feature/LeadCaptureModal';
 import { useI18n } from '@/lib/i18n';
+import { api } from '@/lib/api';
+import { formatPrice } from '@/lib/utils';
 
 export default function HeroSection() {
   const { t, locale } = useI18n();
   const [leadOpen, setLeadOpen] = useState(false);
+  const [featured, setFeatured] = useState([]);
+  const [slideIdx, setSlideIdx] = useState(0);
   const fmt = (n) => new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US').format(n);
+
+  // Live property slider — fetched from the API, no hardcoded mock
+  useEffect(() => {
+    api.properties({ featured: true, transaction: 'sale' })
+      .then((d) => setFeatured((d.properties || []).slice(0, 5)))
+      .catch(() => setFeatured([]));
+  }, []);
+
+  // Auto-rotate every 5s
+  useEffect(() => {
+    if (featured.length < 2) return;
+    const t = setInterval(() => setSlideIdx((i) => (i + 1) % featured.length), 5000);
+    return () => clearInterval(t);
+  }, [featured.length]);
+
+  const slide = featured[slideIdx];
 
   return (
     <section className="relative pt-32 pb-24 sm:pt-36 sm:pb-32 overflow-hidden">
@@ -116,70 +136,93 @@ export default function HeroSection() {
             </motion.div>
           </div>
 
-          {/* Right: product mockup */}
+          {/* Right: dynamic property slider — fetched live from the API */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="lg:col-span-6 relative"
           >
-            {/* Glow */}
             <div className="absolute -inset-6 bg-gradient-to-tr from-brand-500/20 via-transparent to-brand-300/20 blur-2xl rounded-[3rem]" />
 
-            {/* Browser window mockup */}
             <div className="relative rounded-3xl border border-ink-200/70 bg-white shadow-card overflow-hidden">
-              {/* Window chrome */}
-              <div className="flex items-center gap-2 px-4 h-9 bg-ink-50 border-b border-ink-100">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                <div className="mx-auto h-5 px-3 inline-flex items-center text-[11px] text-ink-500 bg-white border border-ink-200 rounded-md font-medium">
-                  omega.mu/properties
-                </div>
-              </div>
-
-              {/* Mockup content — mini property cards */}
-              <div className="p-4 sm:p-5 bg-gradient-to-b from-ink-50/40 to-white">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-display font-bold text-ink-900">Biens à la une</p>
-                  <span className="text-xs text-ink-500 font-semibold">3 résultats</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {miniListings.map((p, i) => (
+              {/* Big slider canvas */}
+              <div className="relative aspect-[4/3] sm:aspect-[16/11] bg-ink-100 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {slide ? (
                     <motion.div
-                      key={p.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: 0.35 + i * 0.08 }}
-                      className="rounded-xl bg-white border border-ink-100 shadow-soft overflow-hidden"
+                      key={slide.id}
+                      initial={{ opacity: 0, scale: 1.02 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{    opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                      className="absolute inset-0"
                     >
-                      <div className="relative h-28 bg-ink-100">
-                        <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                        {p.new && (
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-brand-600 text-white">
+                      <img
+                        src={slide.images?.[0]}
+                        alt={slide.title}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-ink-950/15 to-transparent" />
+
+                      <div className="absolute top-4 left-4 flex flex-wrap gap-1.5">
+                        {slide.new && (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider bg-brand-600 text-white shadow-soft">
                             NOUVEAU
                           </span>
                         )}
-                        <span className="absolute top-2 right-2 h-6 w-6 grid place-items-center bg-white/95 rounded-full">
-                          <Heart className="h-3 w-3 text-ink-700" />
-                        </span>
+                        {Array.isArray(slide.tags) && slide.tags.includes('Expat Opportunity') && (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider bg-amber-400 text-amber-950 shadow-soft">
+                            EXPAT OPPORTUNITY
+                          </span>
+                        )}
                       </div>
-                      <div className="p-2.5">
-                        <p className="text-[12px] font-bold text-ink-900 truncate">{p.title}</p>
-                        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-ink-500">
-                          <MapPin className="h-2.5 w-2.5" /> {p.loc}
+
+                      <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-200">
+                          {slide.type} · {slide.region}
+                        </p>
+                        <h3 className="mt-1 font-display font-extrabold text-xl sm:text-2xl leading-tight line-clamp-2">
+                          {locale === 'en' && slide.titleEn ? slide.titleEn : slide.title}
+                        </h3>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-white/85">
+                          <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {slide.location}</span>
+                          <span className="inline-flex items-center gap-1"><Maximize className="h-3 w-3" /> {slide.surface} m²</span>
+                          <span className="inline-flex items-center gap-1"><BedDouble className="h-3 w-3" /> {slide.bedrooms}</span>
+                          <span className="inline-flex items-center gap-1"><Bath className="h-3 w-3" /> {slide.bathrooms}</span>
                         </div>
-                        <div className="flex items-center gap-3 mt-1.5 text-[10px] text-ink-600">
-                          <span className="inline-flex items-center gap-0.5"><Maximize className="h-2.5 w-2.5" /> {p.m2}m²</span>
-                          <span className="inline-flex items-center gap-0.5"><BedDouble className="h-2.5 w-2.5" /> {p.bd}</span>
-                          <span className="inline-flex items-center gap-0.5"><Bath className="h-2.5 w-2.5" /> {p.bt}</span>
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <p className="font-display font-extrabold text-2xl">
+                            {formatPrice(slide.price, slide.currency, locale === 'fr' ? 'fr-FR' : 'en-US')}
+                          </p>
+                          <Link
+                            href={`/properties/${slide.id}`}
+                            className="inline-flex items-center gap-1 text-xs font-bold bg-white text-ink-900 px-3 py-1.5 rounded-full hover:bg-brand-50 transition"
+                          >
+                            Voir la fiche <ArrowRight className="h-3 w-3" />
+                          </Link>
                         </div>
-                        <p className="mt-1.5 font-display font-extrabold text-sm text-ink-900">{fmt(p.price)} €</p>
                       </div>
                     </motion.div>
+                  ) : (
+                    <div className="absolute inset-0 skeleton" />
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Slide indicators */}
+              {featured.length > 1 && (
+                <div className="absolute bottom-3 right-4 flex gap-1.5 z-10">
+                  {featured.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSlideIdx(i)}
+                      aria-label={`Slide ${i + 1}`}
+                      className={`h-1.5 rounded-full transition-all ${i === slideIdx ? 'w-6 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'}`}
+                    />
                   ))}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Floating notification card */}
@@ -221,28 +264,3 @@ export default function HeroSection() {
     </section>
   );
 }
-
-const miniListings = [
-  {
-    id: 'ma7-1882',
-    title: 'Penthouse 400 m² vue mer',
-    loc: 'Grand Baie',
-    image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=640&q=80',
-    m2: 400,
-    bd: 3,
-    bt: 3,
-    price: 2890000,
-    new: true,
-  },
-  {
-    id: 'ma7-1735',
-    title: 'Villa contemporaine 5p.',
-    loc: 'Grand Baie',
-    image: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=640&q=80',
-    m2: 416,
-    bd: 4,
-    bt: 4,
-    price: 1690000,
-    new: true,
-  },
-];

@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  User, Heart, Calendar, MessageSquare, Settings, ShieldCheck, Camera, Save, KeyRound, Bell, AlertCircle, CheckCircle2, Newspaper, ExternalLink,
+  User, Heart, Calendar, MessageSquare, Settings, ShieldCheck, Camera, Save, KeyRound, Bell, AlertCircle, CheckCircle2, Newspaper, ExternalLink, MapPin,
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -12,6 +12,7 @@ import { cn, formatDate, timeAgo } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import PostCard from '@/components/feature/PostCard';
 import PostComposer from '@/components/feature/PostComposer';
+import FollowersModal from '@/components/feature/FollowersModal';
 import { PostSkeleton } from '@/components/ui/Skeleton';
 
 const TABS = [
@@ -36,6 +37,15 @@ function ProfilePageInner() {
   const search = useSearchParams();
   const router = useRouter();
   const tab = TABS.find((t) => t.id === search.get('tab'))?.id || 'account';
+  const [publicStats, setPublicStats] = useState(null);
+  const [followersOpen, setFollowersOpen] = useState(null); // null | 'followers' | 'following'
+
+  useEffect(() => {
+    if (!user) return;
+    api.publicUser(user.id)
+      .then((d) => setPublicStats(d.user))
+      .catch(() => {});
+  }, [user]);
 
   if (loading) return null;
   if (!user) {
@@ -53,22 +63,67 @@ function ProfilePageInner() {
 
   return (
     <div className="max-w-6xl mx-auto animate-fadeIn">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center gap-4 mb-8">
-        <img
-          src={user.avatar}
-          alt={user.name}
-          className="h-20 w-20 rounded-2xl object-cover ring-4 ring-white shadow-soft"
+      {/* Header — gradient banner with stats */}
+      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-ink-900 via-brand-900 to-ink-900 text-white mb-8">
+        <div className="absolute inset-0 bg-grid opacity-25 mix-blend-overlay pointer-events-none" />
+        <div
+          className="absolute -top-24 -right-24 h-72 w-72 rounded-full blur-3xl opacity-30"
+          style={{ background: 'radial-gradient(closest-side, #22d3ee, transparent)' }}
         />
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-brand-700">
-            <ShieldCheck className="h-4 w-4" />
-            <span className="text-xs font-bold uppercase tracking-[0.18em]">Compte vérifié</span>
+        <div className="relative p-6 lg:p-8">
+          <div className="flex flex-col md:flex-row md:items-center gap-5">
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="h-24 w-24 rounded-2xl object-cover ring-4 ring-white/90 shadow-card"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-brand-200">
+                <ShieldCheck className="h-4 w-4" />
+                <span className="text-xs font-bold uppercase tracking-[0.18em]">Compte vérifié</span>
+              </div>
+              <h1 className="font-display font-extrabold text-2xl lg:text-3xl mt-1">{user.name}</h1>
+              <p className="text-sm text-white/70">
+                {user.email}
+                {user.location && <> · <MapPin className="h-3 w-3 inline" /> {user.location}</>}
+                {' · '}Membre depuis {formatDate(user.createdAt)}
+              </p>
+            </div>
+            <Link
+              href={`/users/${user.id}`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 self-start md:self-center h-10 px-4 rounded-xl bg-white text-ink-900 font-semibold text-sm hover:bg-brand-50 transition shrink-0"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Voir profil public
+            </Link>
           </div>
-          <h1 className="font-display font-extrabold text-2xl lg:text-3xl mt-1 text-ink-900">{user.name}</h1>
-          <p className="text-sm text-ink-500">{user.email} · Membre depuis {formatDate(user.createdAt)}</p>
+
+          {/* Stats strip — followers & following clickable */}
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Publications" value={publicStats?.postsCount} />
+            <Stat
+              label="Followers"
+              value={publicStats?.followersCount}
+              onClick={() => setFollowersOpen('followers')}
+            />
+            <Stat
+              label="Following"
+              value={publicStats?.followingCount}
+              onClick={() => setFollowersOpen('following')}
+            />
+            <Stat label="J'aime reçus" value={publicStats?.likesReceived} />
+          </div>
         </div>
       </div>
+
+      <FollowersModal
+        open={!!followersOpen}
+        onClose={() => setFollowersOpen(null)}
+        userId={user.id}
+        initialTab={followersOpen || 'followers'}
+        counts={{ followers: publicStats?.followersCount, following: publicStats?.followingCount }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Tabs sidebar */}
@@ -301,10 +356,10 @@ function MyPostsPanel() {
           <div className="space-y-4">
             {posts.map((p) => (
               <PostCard
-                key={p.id}
+                key={p.feedKey || p.id}
                 post={p}
                 onDeleted={(id) => setPosts((curr) => curr.filter((x) => x.id !== id))}
-                onUpdated={(u) => setPosts((curr) => curr.map((x) => (x.id === u.id ? u : x)))}
+                onUpdated={(u) => setPosts((curr) => curr.map((x) => (x.id === u.id ? { ...x, ...u } : x)))}
               />
             ))}
           </div>
@@ -566,6 +621,25 @@ function Switch({ checked, onChange }) {
         )}
       />
     </button>
+  );
+}
+
+function Stat({ label, value, onClick }) {
+  const cls = 'rounded-2xl border border-white/15 bg-white/5 px-4 py-3 backdrop-blur-sm w-full text-left';
+  const inner = (
+    <>
+      <p className="font-display font-extrabold text-xl text-white">
+        {value ?? <span className="text-white/40">—</span>}
+      </p>
+      <p className="text-[11px] text-white/60 mt-0.5 font-semibold uppercase tracking-wider">{label}</p>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${cls} hover:bg-white/10 transition cursor-pointer`}>
+      {inner}
+    </button>
+  ) : (
+    <div className={cls}>{inner}</div>
   );
 }
 

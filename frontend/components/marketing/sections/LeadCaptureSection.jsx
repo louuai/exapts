@@ -18,7 +18,7 @@ export default function LeadCaptureSection() {
     setLoading(true);
     setError(null);
     try {
-      await api.createLead({ ...form, interest: 'real-estate', source: 'landing-section' });
+      await api.createLead({ ...form, type: 'general', interest: 'real-estate', source: 'landing-section' });
       setDone(true);
     } catch (err) {
       setError(err.message);

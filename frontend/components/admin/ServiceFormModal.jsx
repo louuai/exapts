@@ -8,6 +8,7 @@ const EMPTY = {
   name: '', category: 'Notaire', description: '', location: '',
   image: '', subscription: 'standard',
   contact: { phone: '', email: '', website: '' },
+  sourceUrl: '', internalNotes: '', // admin-only
 };
 
 const CATEGORIES = ['Notaire', 'Agence immobilière', 'Avocat', 'Banque', 'Déménagement', 'École internationale', 'Santé', 'Transport', 'Autre'];
@@ -115,6 +116,21 @@ export default function ServiceFormModal({ open, onClose, onSave, initial }) {
           <Field label="Téléphone" value={form.contact.phone} onChange={(v) => updateContact('phone', v)} placeholder="+230 5 720 14 22" />
           <Field label="Email" type="email" value={form.contact.email} onChange={(v) => updateContact('email', v)} />
           <Field label="Site web" type="url" value={form.contact.website} onChange={(v) => updateContact('website', v)} placeholder="https://" />
+        </div>
+
+        {/* Admin-only — never exposed to public */}
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Champs internes (admin)</p>
+          <Field label="Lien source" value={form.sourceUrl} onChange={(v) => update('sourceUrl', v)} placeholder="https://…" />
+          <div>
+            <label className="block text-xs font-semibold text-ink-700 mb-1.5">Notes internes</label>
+            <textarea
+              value={form.internalNotes}
+              onChange={(e) => update('internalNotes', e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 rounded-xl border border-ink-200 bg-white text-sm focus:border-brand-400 focus:ring-4 focus:ring-brand-100 focus:outline-none resize-none"
+            />
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">

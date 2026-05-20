@@ -9,6 +9,8 @@ import LeadCaptureSection from '@/components/marketing/sections/LeadCaptureSecti
 import HowItWorksSection from '@/components/marketing/sections/HowItWorksSection';
 import TestimonialsSection from '@/components/marketing/sections/TestimonialsSection';
 import FinalCTASection from '@/components/marketing/sections/FinalCTASection';
+import LeadGenPopup from '@/components/feature/LeadGenPopup';
+import WhatsAppButton from '@/components/feature/WhatsAppButton';
 
 export const metadata = {
   title: 'OMEGA — Installez-vous à Maurice, sans le stress.',
@@ -38,6 +40,10 @@ export default function LandingPage() {
         <FinalCTASection />
       </main>
       <MarketingFooter />
+
+      {/* Conversion boosters — always on for the public landing */}
+      <LeadGenPopup />
+      <WhatsAppButton />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -10,14 +10,18 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDate } from '@/lib/utils';
 import PostCard from '@/components/feature/PostCard';
+import FollowButton from '@/components/feature/FollowButton';
+import FollowersModal from '@/components/feature/FollowersModal';
 import { PostSkeleton } from '@/components/ui/Skeleton';
 
 export default function PublicUserProfilePage() {
   const { id } = useParams();
+  const router = useRouter();
   const { user: viewer } = useAuth();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState(null);
   const [error, setError] = useState(null);
+  const [followersOpen, setFollowersOpen] = useState(null); // null | 'followers' | 'following'
 
   useEffect(() => {
     let alive = true;
@@ -114,7 +118,7 @@ export default function PublicUserProfilePage() {
               )}
             </div>
 
-            {isMe && (
+            {isMe ? (
               <Link
                 href="/profile"
                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-white text-ink-900 font-semibold text-sm hover:bg-brand-50 transition self-start sm:self-center"
@@ -122,17 +126,58 @@ export default function PublicUserProfilePage() {
                 <Settings className="h-4 w-4" />
                 Gérer mon profil
               </Link>
+            ) : viewer && (
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <FollowButton
+                  targetUserId={profile.id}
+                  initialFollowing={!!profile.isFollowing}
+                  onChange={(following) => setProfile((p) => ({
+                    ...p,
+                    isFollowing: following,
+                    followersCount: (p.followersCount || 0) + (following ? 1 : -1),
+                  }))}
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      const { conversationId } = await api.startConversation(profile.id);
+                      router.push(`/messages/${conversationId}`);
+                    } catch (err) { alert(err.message); }
+                  }}
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-white text-ink-900 font-semibold text-sm border border-ink-200 hover:bg-ink-50 transition"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Message
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Stats bar */}
-          <div className="mt-7 grid grid-cols-3 gap-3 max-w-md">
+          {/* Stats bar — followers & following are clickable (Instagram-style) */}
+          <div className="mt-7 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
             <Stat label="Publications" value={profile.postsCount} />
+            <Stat
+              label="Followers"
+              value={profile.followersCount}
+              onClick={() => setFollowersOpen('followers')}
+            />
+            <Stat
+              label="Following"
+              value={profile.followingCount}
+              onClick={() => setFollowersOpen('following')}
+            />
             <Stat label="J'aime reçus" value={profile.likesReceived} />
-            <Stat label="Statut" value={isMe ? 'C\'est moi' : 'Expat'} />
           </div>
         </div>
       </div>
+
+      <FollowersModal
+        open={!!followersOpen}
+        onClose={() => setFollowersOpen(null)}
+        userId={profile.id}
+        initialTab={followersOpen || 'followers'}
+        counts={{ followers: profile.followersCount, following: profile.followingCount }}
+      />
 
       {/* Posts feed */}
       <section className="mt-8 space-y-4">
@@ -159,7 +204,7 @@ export default function PublicUserProfilePage() {
           <motion.div className="space-y-4" initial="hidden" animate="visible">
             {posts.map((p) => (
               <PostCard
-                key={p.id}
+                key={p.feedKey || p.id}
                 post={p}
                 onDeleted={(id) => setPosts((curr) => curr.filter((x) => x.id !== id))}
                 onUpdated={(u) => setPosts((curr) => curr.map((x) => (x.id === u.id ? u : x)))}
@@ -172,11 +217,19 @@ export default function PublicUserProfilePage() {
   );
 }
 
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 backdrop-blur-sm">
+function Stat({ label, value, onClick }) {
+  const cls = 'rounded-2xl border border-white/15 bg-white/5 px-4 py-3 backdrop-blur-sm w-full text-left';
+  const inner = (
+    <>
       <p className="font-display font-extrabold text-xl text-white">{value ?? '—'}</p>
       <p className="text-[11px] text-white/60 mt-0.5 font-semibold uppercase tracking-wider">{label}</p>
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${cls} hover:bg-white/10 transition cursor-pointer`}>
+      {inner}
+    </button>
+  ) : (
+    <div className={cls}>{inner}</div>
   );
 }

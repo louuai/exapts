@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Users, TrendingUp } from 'lucide-react';
 import PostCard from '@/components/feature/PostCard';
 import PostComposer from '@/components/feature/PostComposer';
+import UserSearchInput from '@/components/feature/UserSearchInput';
 import { PostSkeleton } from '@/components/ui/Skeleton';
 import { useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
@@ -30,6 +31,11 @@ export default function CommunityPage() {
         <p className="text-ink-600 max-w-2xl">{t('community.subtitle')}</p>
       </div>
 
+      {/* Search bar — find any member of the community */}
+      <div className="rounded-2xl bg-white border border-ink-100 shadow-soft p-3">
+        <UserSearchInput placeholder="Rechercher un membre par nom, localité…" />
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-4">
           <PostComposer
@@ -40,10 +46,10 @@ export default function CommunityPage() {
             ? Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)
             : posts.map((p) => (
                 <PostCard
-                  key={p.id}
+                  key={p.feedKey || p.id}
                   post={p}
                   onDeleted={(id) => setPosts((curr) => curr.filter((x) => x.id !== id))}
-                  onUpdated={(u) => setPosts((curr) => curr.map((x) => (x.id === u.id ? u : x)))}
+                  onUpdated={(u) => setPosts((curr) => curr.map((x) => (x.id === u.id ? { ...x, ...u } : x)))}
                 />
               ))}
         </div>

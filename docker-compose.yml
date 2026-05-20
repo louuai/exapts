@@ -1,8 +1,59 @@
 services:
+  # =======================================================================
+  # PostgreSQL — source of truth for every entity
+  # =======================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: omega-postgres
+    environment:
+      POSTGRES_USER: omega
+      POSTGRES_PASSWORD: omega
+      POSTGRES_DB: omega
+    volumes:
+      - omega-pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omega -d omega"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - omega
+
+  # =======================================================================
+  # Redis — BullMQ jobs + read-through cache
+  # =======================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: omega-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - omega-redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - omega
+
+  # =======================================================================
+  # Backend API + Socket.io
+  # =======================================================================
   backend:
     build:
       context: ./backend
     container_name: omega-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "4000:4000"
     environment:
@@ -11,16 +62,46 @@ services:
       JWT_SECRET: change-me-to-a-long-random-string
       JWT_EXPIRES_IN: 7d
       CORS_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://omega:omega@postgres:5432/omega?schema=public
+      REDIS_URL: redis://redis:6379
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
-      timeout: 4s
-      retries: 5
-      start_period: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - omega
 
+  # =======================================================================
+  # Workers (BullMQ) — email + heavy fanouts (notifications)
+  # Same image as backend, just runs src/worker.js
+  # =======================================================================
+  worker:
+    build:
+      context: ./backend
+    container_name: omega-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://omega:omega@postgres:5432/omega?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change-me-to-a-long-random-string
+    command: ["node", "src/worker.js"]
+    restart: unless-stopped
+    networks:
+      - omega
+
+  # =======================================================================
+  # Frontend (Next.js)
+  # =======================================================================
   frontend:
     build:
       context: ./frontend
@@ -39,14 +120,9 @@ services:
     networks:
       - omega
 
-  # ---------------------------------------------------------------------------
-  # Mobile (Expo) — defaults to WEB mode so anyone can open the app in their
-  # browser at http://localhost:19006 with zero extra setup.
-  #
-  # For a "real device" demo, run instead:
-  #   docker compose -f docker-compose.yml -f docker-compose.mobile-lan.yml up
-  # which switches the CMD to LAN mode and uses your host's LAN IP.
-  # ---------------------------------------------------------------------------
+  # =======================================================================
+  # Mobile (Expo, web mode by default)
+  # =======================================================================
   mobile:
     build:
       context: ./mobile
@@ -55,17 +131,20 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "19006:19006"   # Expo Web
-      - "8081:8081"     # Metro bundler (only useful in LAN mode)
-      - "19000:19000"   # Expo Go (LAN mode)
+      - "19006:19006"
+      - "8081:8081"
+      - "19000:19000"
       - "19001:19001"
       - "19002:19002"
     environment:
-      # Vars prefixed with EXPO_PUBLIC_ are inlined into the bundle at start
       EXPO_PUBLIC_API_URL: http://localhost:4000
     restart: unless-stopped
     networks:
       - omega
+
+volumes:
+  omega-pg-data:
+  omega-redis-data:
 
 networks:
   omega:

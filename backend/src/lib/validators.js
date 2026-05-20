@@ -1,0 +1,91 @@
+/**
+ * Centralised Zod schemas for user-supplied payloads.
+ * `validate(schema)` returns an Express middleware that 400s with a clean
+ * error shape if the body fails — no sensitive details leaked.
+ */
+import { z } from 'zod';
+
+const trimmed = (max) => z.string().trim().max(max);
+
+export const schemas = {
+  signup: z.object({
+    email:    z.string().email().max(200),
+    password: z.string().min(6, 'Password must be at least 6 characters').max(200),
+    name:     trimmed(120).optional(),
+  }),
+
+  login: z.object({
+    email:    z.string().email().max(200),
+    password: z.string().min(1).max(200),
+  }),
+
+  changePassword: z.object({
+    currentPassword: z.string().min(1).max(200),
+    newPassword:     z.string().min(6).max(200),
+  }),
+
+  updateProfile: z.object({
+    name:     trimmed(120).optional(),
+    phone:    trimmed(40).optional(),
+    bio:      trimmed(500).optional(),
+    location: trimmed(120).optional(),
+    avatar:   z.string().max(8_000_000).optional(), // data URL or http URL — server-side storage validates further
+    notificationPrefs: z.record(z.boolean()).optional(),
+  }),
+
+  createLead: z.object({
+    type:     z.enum(['property', 'service', 'general']).optional(),
+    propertyId: z.string().max(64).optional(),
+    serviceId:  z.string().max(64).optional(),
+    name:     trimmed(120).min(2, 'Name too short'),
+    email:    z.string().email().max(200),
+    phone:    trimmed(40).optional(),
+    message:  trimmed(2000).optional(),
+    source:   trimmed(64).optional(),
+    interest: trimmed(120).optional(),
+  }),
+
+  createPost: z.object({
+    content: trimmed(5000).min(1, 'Content required'),
+    image:   z.string().max(8_000_000).optional().nullable(),
+    tag:     trimmed(64).optional(),
+  }),
+
+  updatePost: z.object({
+    content: trimmed(5000).min(1).optional(),
+    image:   z.string().max(8_000_000).optional().nullable(),
+    tag:     trimmed(64).optional(),
+  }),
+
+  createComment: z.object({
+    content:  trimmed(2000).min(1),
+    parentId: z.string().max(64).optional().nullable(),
+  }),
+
+  createVisit: z.object({
+    propertyId:    z.string().max(64),
+    preferredDate: z.string().max(40).optional().nullable(),
+    message:       trimmed(2000).optional().nullable(),
+    phone:         trimmed(40).optional(),
+  }),
+
+  sendChatMessage: z.object({
+    body: trimmed(4000).min(1),
+  }),
+};
+
+/** Returns an express middleware that validates req.body against a schema. */
+export function validate(schema) {
+  return (req, res, next) => {
+    const parsed = schema.safeParse(req.body || {});
+    if (!parsed.success) {
+      const detail = parsed.error.issues.map((i) => ({
+        path: i.path.join('.'),
+        message: i.message,
+      }));
+      return res.status(400).json({ error: detail[0]?.message || 'Invalid input', detail });
+    }
+    req.body = parsed.data;
+    next();
+  };
+}

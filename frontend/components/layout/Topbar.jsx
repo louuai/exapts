@@ -2,11 +2,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, Globe, LogOut, User, ChevronDown } from 'lucide-react';
+import { Bell, Globe, LogOut, User, ChevronDown, CheckCheck } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { getSocket } from '@/lib/socket';
+import { cn, timeAgo } from '@/lib/utils';
+import UserSearchInput from '@/components/feature/UserSearchInput';
 
 export default function Topbar() {
   const { locale, setLocale, t } = useI18n();
@@ -19,8 +21,22 @@ export default function Topbar() {
   const notifRef = useRef(null);
 
   useEffect(() => {
+    if (!user) return;
     api.notifications().then((d) => setNotifications(d.notifications || [])).catch(() => {});
-  }, []);
+  }, [user]);
+
+  // Realtime: prepend new notifications when they arrive via socket
+  useEffect(() => {
+    if (!user) return;
+    const s = getSocket();
+    if (!s) return;
+    const handler = (n) => {
+      // Re-fetch to get hydrated payload (actor, title, body)
+      api.notifications().then((d) => setNotifications(d.notifications || [])).catch(() => {});
+    };
+    s.on('notification:new', handler);
+    return () => s.off('notification:new', handler);
+  }, [user]);
 
   useEffect(() => {
     const onClick = (e) => {
@@ -36,14 +52,9 @@ export default function Topbar() {
   return (
     <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/80 backdrop-blur-md">
       <div className="flex h-16 items-center gap-3 px-4 lg:px-8">
-        {/* Search */}
-        <div className="relative flex-1 max-w-2xl">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-400 pointer-events-none" />
-          <input
-            type="search"
-            placeholder={t('nav.search.placeholder')}
-            className="w-full h-10 pl-10 pr-4 rounded-xl bg-ink-100/70 border border-transparent text-sm placeholder:text-ink-400 focus:bg-white focus:border-ink-200 focus:outline-none focus:ring-4 focus:ring-brand-100 transition-all"
-          />
+        {/* Global user search */}
+        <div className="flex-1 max-w-2xl">
+          <UserSearchInput placeholder={t('nav.search.placeholder')} />
         </div>
 
         {/* Locale switcher */}
@@ -68,26 +79,62 @@ export default function Topbar() {
             )}
           </button>
           {openNotif && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-100 bg-white shadow-card overflow-hidden animate-fadeIn">
+            <div className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-ink-100 bg-white shadow-card overflow-hidden animate-fadeIn">
               <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
                 <span className="text-sm font-semibold">Notifications</span>
-                <span className="text-xs text-ink-500">{unread} non lues</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-ink-500">{unread} non lues</span>
+                  {unread > 0 && (
+                    <button
+                      onClick={async () => {
+                        await api.markAllNotificationsRead().catch(() => {});
+                        setNotifications((curr) => curr.map((n) => ({ ...n, read: true })));
+                      }}
+                      className="text-[11px] font-semibold text-brand-700 hover:text-brand-800 inline-flex items-center gap-1"
+                      title="Tout marquer comme lu"
+                    >
+                      <CheckCheck className="h-3 w-3" /> Tout lu
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="max-h-80 overflow-y-auto">
+              <div className="max-h-96 overflow-y-auto">
                 {notifications.length === 0 && (
                   <p className="p-6 text-center text-sm text-ink-500">Aucune notification</p>
                 )}
                 {notifications.map((n) => (
-                  <div
+                  <button
                     key={n.id}
+                    onClick={async () => {
+                      if (!n.read) {
+                        api.markNotificationRead(n.id).catch(() => {});
+                        setNotifications((curr) => curr.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+                      }
+                      setOpenNotif(false);
+                      // Route to relevant area
+                      const p = n.payload || {};
+                      if (n.type === 'NEW_MESSAGE' && p.conversationId) router.push(`/messages/${p.conversationId}`);
+                      else if (n.type === 'NEW_FOLLOWER' && p.actorId)  router.push(`/users/${p.actorId}`);
+                      else if (['NEW_COMMENT', 'NEW_LIKE', 'NEW_REPOST'].includes(n.type) && p.postId)
+                        router.push('/community');
+                      else if (['NEW_LEAD', 'NEW_VISIT_REQUEST'].includes(n.type)) router.push('/admin');
+                      else if (n.type === 'NEW_PROPERTY' && p.propertyId) router.push(`/properties/${p.propertyId}`);
+                    }}
                     className={cn(
-                      'px-4 py-3 border-b border-ink-50 last:border-0 hover:bg-ink-50/60 transition cursor-pointer',
+                      'w-full text-left px-4 py-3 border-b border-ink-50 last:border-0 hover:bg-ink-50/60 transition flex gap-3',
                       !n.read && 'bg-brand-50/40'
                     )}
                   >
-                    <p className="text-sm font-semibold text-ink-900">{n.title}</p>
-                    <p className="text-xs text-ink-600 mt-0.5">{n.body}</p>
-                  </div>
+                    {n.actor?.avatar && (
+                      <img src={n.actor.avatar} alt="" className="h-8 w-8 rounded-full object-cover shrink-0 ring-2 ring-white shadow-soft" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ink-900 truncate">{n.title}</p>
+                      <p className="text-xs text-ink-600 mt-0.5 line-clamp-2">{n.body}</p>
+                      <p className="text-[10px] text-ink-400 mt-1">{timeAgo(n.createdAt)}</p>
+                    </div>
+                    {!n.read && <span className="h-2 w-2 mt-1.5 rounded-full bg-brand-500 shrink-0" />}
+                  </button>
                 ))}
               </div>
             </div>

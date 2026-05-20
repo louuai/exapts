@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, BedDouble, Bath, Maximize, MapPin, ShieldCheck, Phone, Calendar, Star } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import LeadCaptureModal from '@/components/feature/LeadCaptureModal';
+import PropertyLeadModal from '@/components/feature/PropertyLeadModal';
 import { useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { mockProperties } from '@/lib/mock-fallback';
@@ -14,9 +14,8 @@ import { formatPrice, cn } from '@/lib/utils';
 export default function RealEstateSection() {
   const { t, locale } = useI18n();
   const [properties, setProperties] = useState(mockProperties);
-  const [leadOpen, setLeadOpen] = useState(false);
-  const [leadInterest, setLeadInterest] = useState('real-estate');
-  const [selectedTitle, setSelectedTitle] = useState(null);
+  const [leadProperty, setLeadProperty] = useState(null);
+  const [leadMode, setLeadMode] = useState('contact');
 
   useEffect(() => {
     api.properties({ featured: true, transaction: 'sale' })
@@ -24,10 +23,9 @@ export default function RealEstateSection() {
       .catch(() => {});
   }, []);
 
-  const openLead = (title, interest = 'real-estate') => {
-    setSelectedTitle(title);
-    setLeadInterest(interest);
-    setLeadOpen(true);
+  const openLead = (property, mode = 'contact') => {
+    setLeadProperty(property);
+    setLeadMode(mode);
   };
 
   const pills = [
@@ -141,17 +139,17 @@ export default function RealEstateSection() {
                 </div>
               </Link>
 
-              {/* Card CTAs */}
+              {/* Card CTAs — creates a real Lead with type='property' */}
               <div className="px-4 pb-4 flex gap-2 mt-auto">
                 <button
-                  onClick={(e) => { e.preventDefault(); openLead(p.title, 'contact'); }}
+                  onClick={(e) => { e.preventDefault(); openLead(p, 'contact'); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-ink-700 border border-ink-200 bg-white hover:bg-ink-50 transition"
                 >
                   <Phone className="h-3.5 w-3.5" />
                   Contact
                 </button>
                 <button
-                  onClick={(e) => { e.preventDefault(); openLead(p.title, 'visit'); }}
+                  onClick={(e) => { e.preventDefault(); openLead(p, 'visit'); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl text-xs font-bold text-white bg-ink-900 hover:bg-ink-800 transition"
                 >
                   <Calendar className="h-3.5 w-3.5" />
@@ -163,11 +161,11 @@ export default function RealEstateSection() {
         </div>
       </div>
 
-      <LeadCaptureModal
-        open={leadOpen}
-        onClose={() => setLeadOpen(false)}
-        interest={leadInterest}
-        source={`landing-property:${selectedTitle || 'unknown'}`}
+      <PropertyLeadModal
+        open={!!leadProperty}
+        onClose={() => setLeadProperty(null)}
+        property={leadProperty}
+        mode={leadMode}
       />
     </section>
   );

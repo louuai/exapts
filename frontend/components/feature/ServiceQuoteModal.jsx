@@ -33,6 +33,8 @@ export default function ServiceQuoteModal({ open, onClose, service }) {
     try {
       await api.createLead({
         ...form,
+        type: 'service',
+        serviceId: service?.id,
         source: 'service-directory',
         interest: `service:${service?.id || 'unknown'}`,
       });

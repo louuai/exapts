@@ -1,24 +1,42 @@
 import { Router } from 'express';
-import { favorites, properties } from '../data/store.js';
+import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
+import { serializeProperty } from '../lib/serializers.js';
 
 const router = Router();
 
-router.get('/', requireAuth, (req, res) => {
-  const set = favorites.get(req.user.sub) || new Set();
-  const items = properties.filter((p) => set.has(p.id));
-  res.json({ favorites: items, ids: [...set] });
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const rows = await prisma.favorite.findMany({
+      where: { userId: req.user.sub },
+      include: { property: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({
+      favorites: rows.map((r) => serializeProperty(r.property)),
+      ids: rows.map((r) => r.propertyId),
+    });
+  } catch (e) { next(e); }
 });
 
-router.post('/:propertyId', requireAuth, (req, res) => {
-  const { propertyId } = req.params;
-  if (!properties.find((p) => p.id === propertyId))
-    return res.status(404).json({ error: 'Property not found' });
-  const set = favorites.get(req.user.sub) || new Set();
-  if (set.has(propertyId)) set.delete(propertyId);
-  else set.add(propertyId);
-  favorites.set(req.user.sub, set);
-  res.json({ ids: [...set] });
+router.post('/:propertyId', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.sub;
+    const propertyId = req.params.propertyId;
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    const existing = await prisma.favorite.findUnique({ where: { userId_propertyId: { userId, propertyId } } });
+    if (existing) {
+      await prisma.favorite.delete({ where: { id: existing.id } });
+    } else {
+      await prisma.favorite.create({ data: { userId, propertyId } });
+    }
+
+    const ids = (await prisma.favorite.findMany({ where: { userId }, select: { propertyId: true } }))
+      .map((f) => f.propertyId);
+    res.json({ ids });
+  } catch (e) { next(e); }
 });
 
 export default router;

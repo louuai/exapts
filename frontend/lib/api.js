@@ -48,10 +48,30 @@ export const api = {
   updatePost: (id, payload) => request(`/api/posts/${id}`, { method: 'PATCH', body: payload, auth: true }),
   deletePost: (id) => request(`/api/posts/${id}`, { method: 'DELETE', auth: true }),
   likePost:   (id) => request(`/api/posts/${id}/like`, { method: 'POST', auth: true }),
+  repostPost: (id, commentary) =>
+    request(`/api/posts/${id}/repost`, { method: 'POST', body: { commentary }, auth: true }),
 
-  // Public user profiles
-  publicUser:  (id) => request(`/api/users/${id}`),
-  userPosts:   (id) => request(`/api/users/${id}/posts`),
+  // Comments
+  comments:        (postId) => request(`/api/posts/${postId}/comments`),
+  createComment:   (postId, payload) => request(`/api/posts/${postId}/comments`, { method: 'POST', body: payload, auth: true }),
+  deleteComment:   (id) => request(`/api/comments/${id}`, { method: 'DELETE', auth: true }),
+
+  // Public user profiles + follow
+  publicUser:   (id) => request(`/api/users/${id}`, { auth: true }),
+  userPosts:    (id) => request(`/api/users/${id}/posts`, { auth: true }),
+  userFollowers:(id) => request(`/api/users/${id}/followers`),
+  userFollowing:(id) => request(`/api/users/${id}/following`),
+  toggleFollow: (id) => request(`/api/follow/${id}`, { method: 'POST', auth: true }),
+  searchUsers:  (q, limit = 8) => request(`/api/users${qs({ q, limit })}`),
+
+  // Conversations / chat
+  conversations:       () => request('/api/conversations', { auth: true }),
+  startConversation:   (userId) => request('/api/conversations', { method: 'POST', body: { userId }, auth: true }),
+  deleteConversation:  (id) => request(`/api/conversations/${id}`, { method: 'DELETE', auth: true }),
+  conversationMessages:(id) => request(`/api/conversations/${id}/messages`, { auth: true }),
+  sendChatMessage:     (id, body) => request(`/api/conversations/${id}/messages`, { method: 'POST', body: { body }, auth: true }),
+  editChatMessage:     (id, msgId, body) => request(`/api/conversations/${id}/messages/${msgId}`, { method: 'PATCH',  body: { body }, auth: true }),
+  deleteChatMessage:   (id, msgId)       => request(`/api/conversations/${id}/messages/${msgId}`, { method: 'DELETE', auth: true }),
 
   // Properties
   properties: (params = {}) => request(`/api/properties${qs(params)}`),
@@ -68,13 +88,17 @@ export const api = {
     request(`/api/favorites/${id}`, { method: 'POST', auth: true }),
 
   // Notifications
-  notifications: () => request('/api/notifications'),
+  notifications:     () => request('/api/notifications', { auth: true }),
+  markNotificationRead: (id) => request(`/api/notifications/${id}/read`, { method: 'POST', auth: true }),
+  markAllNotificationsRead: () => request('/api/notifications/read-all', { method: 'POST', auth: true }),
 
-  // Leads (public capture)
+  // Leads — public capture + admin management (unified Lead model)
   createLead: (payload) => request('/api/leads', { method: 'POST', body: payload }),
-  leads: (params = {}) => request(`/api/leads${qs(params)}`, { auth: true }),
-  updateLead: (id, payload) => request(`/api/leads/${id}`, { method: 'PATCH', body: payload, auth: true }),
-  deleteLead: (id) => request(`/api/leads/${id}`, { method: 'DELETE', auth: true }),
+  // params: { type: 'property'|'service'|'general', status, q, from, to }
+  leads:       (params = {}) => request(`/api/admin/leads${qs(params)}`, { auth: true }),
+  adminLeads:  (params = {}) => request(`/api/admin/leads${qs(params)}`, { auth: true }),
+  updateLead:  (id, payload) => request(`/api/admin/leads/${id}`, { method: 'PATCH',  body: payload, auth: true }),
+  deleteLead:  (id)          => request(`/api/admin/leads/${id}`, { method: 'DELETE', auth: true }),
 
   // Visit requests
   createVisitRequest: (payload) =>

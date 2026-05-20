@@ -33,7 +33,6 @@ export function optionalAuth(req, _res, next) {
   next();
 }
 
-/* Stack AFTER requireAuth — verifies the JWT carries role: 'admin'. */
 export function requireAdmin(req, res, next) {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });

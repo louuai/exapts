@@ -8,6 +8,7 @@ const dictionaries = {
     'nav.community': 'Communauté',
     'nav.properties': 'Immobilier',
     'nav.services': 'Annuaire',
+    'nav.messages': 'Messages',
     'nav.favorites': 'Favoris',
     'nav.profile': 'Profil',
     'nav.logout': 'Déconnexion',

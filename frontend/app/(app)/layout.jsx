@@ -1,6 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import MobileNav from '@/components/layout/MobileNav';
+import WhatsAppButton from '@/components/feature/WhatsAppButton';
 
 export default function AppLayout({ children }) {
   return (
@@ -13,6 +14,7 @@ export default function AppLayout({ children }) {
         </main>
         <MobileNav />
       </div>
+      <WhatsAppButton />
     </div>
   );
 }

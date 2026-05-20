@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { timeAgo, cn } from '@/lib/utils';
 import Badge from '@/components/ui/Badge';
 import EditPostModal from '@/components/feature/EditPostModal';
+import CommentsSection from '@/components/feature/CommentsSection';
 
 export default function PostCard({ post: initial, onDeleted, onUpdated }) {
   const { locale, t } = useI18n();
@@ -16,6 +17,10 @@ export default function PostCard({ post: initial, onDeleted, onUpdated }) {
   const [post, setPost] = useState(initial);
   const [liked, setLiked] = useState(initial.liked || false);
   const [likes, setLikes] = useState(initial.likes);
+  const [reposted, setReposted] = useState(initial.reposted || false);
+  const [repostsCount, setRepostsCount] = useState(initial.repostsCount || 0);
+  const [commentsCount, setCommentsCount] = useState(initial.comments || 0);
+  const [showComments, setShowComments] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -26,6 +31,9 @@ export default function PostCard({ post: initial, onDeleted, onUpdated }) {
     setPost(initial);
     setLiked(initial.liked || false);
     setLikes(initial.likes);
+    setReposted(initial.reposted || false);
+    setRepostsCount(initial.repostsCount || 0);
+    setCommentsCount(initial.comments || 0);
   }, [initial]);
 
   // Close kebab menu on outside click
@@ -46,6 +54,19 @@ export default function PostCard({ post: initial, onDeleted, onUpdated }) {
     } catch {
       setLiked((v) => !v);
       setLikes((n) => (liked ? n + 1 : n - 1));
+    }
+  }
+
+  async function toggleRepost() {
+    if (!user) return;
+    const willRepost = !reposted;
+    setReposted(willRepost);
+    setRepostsCount((n) => n + (willRepost ? 1 : -1));
+    try {
+      await api.repostPost(post.id);
+    } catch {
+      setReposted(!willRepost);
+      setRepostsCount((n) => n + (willRepost ? -1 : 1));
     }
   }
 
@@ -79,6 +100,25 @@ export default function PostCard({ post: initial, onDeleted, onUpdated }) {
           deleting && 'opacity-50 pointer-events-none'
         )}
       >
+        {/* Repost attribution banner — Instagram-style */}
+        {post.repost && (
+          <div className="flex items-center gap-2 px-5 pt-4 -mb-2">
+            <Repeat2 className="h-3.5 w-3.5 text-emerald-600" />
+            <Link
+              href={`/users/${post.repost.by?.id}`}
+              className="text-xs text-ink-600 hover:text-ink-900 truncate"
+            >
+              <strong className="font-semibold text-ink-700">{post.repost.by?.name}</strong>
+              <span className="text-ink-500"> a partagé · {timeAgo(post.repost.at, locale === 'fr' ? 'fr-FR' : 'en-US')}</span>
+            </Link>
+          </div>
+        )}
+        {post.repost?.commentary && (
+          <p className="px-5 pt-3 text-sm text-ink-700 italic border-l-2 border-emerald-400 ml-5">
+            "{post.repost.commentary}"
+          </p>
+        )}
+
         <div className="p-5">
           <header className="flex items-start justify-between gap-3">
             <Link
@@ -163,15 +203,33 @@ export default function PostCard({ post: initial, onDeleted, onUpdated }) {
               <Heart className={cn('h-4 w-4', liked && 'fill-rose-500 stroke-rose-500')} />
               {likes}
             </button>
-            <span className="inline-flex items-center gap-1.5 text-ink-600 font-semibold">
+            <button
+              onClick={() => setShowComments((v) => !v)}
+              className="inline-flex items-center gap-1.5 font-semibold text-ink-600 hover:text-ink-900 transition"
+            >
               <MessageCircle className="h-4 w-4" />
-              {post.comments}
-            </span>
+              {commentsCount}
+            </button>
           </div>
-          <button className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-800 transition">
-            <Share2 className="h-4 w-4" /> {t('common.share')}
+          <button
+            onClick={toggleRepost}
+            className={cn(
+              'inline-flex items-center gap-1.5 font-semibold transition',
+              reposted ? 'text-emerald-600' : 'text-ink-500 hover:text-ink-800'
+            )}
+          >
+            <Repeat2 className="h-4 w-4" />
+            {reposted ? 'Partagé' : 'Partager'}
+            {repostsCount > 0 && <span className="text-xs">· {repostsCount}</span>}
           </button>
         </footer>
+
+        {showComments && (
+          <CommentsSection
+            postId={post.id}
+            onCountChange={(n) => setCommentsCount(n)}
+          />
+        )}
       </motion.article>
 
       {ownsPost && (

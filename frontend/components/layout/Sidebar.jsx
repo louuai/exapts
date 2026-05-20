@@ -12,6 +12,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
@@ -23,7 +24,8 @@ const items = [
   { href: '/properties', icon: Building2,       key: 'nav.properties' },
   { href: '/guides',     icon: BookOpen,        key: 'nav.guides' },
   { href: '/community',  icon: Users,           key: 'nav.community' },
-  { href: '/services',   icon: Briefcase,       key: 'nav.services',  label: 'Services' },
+  { href: '/services',   icon: Briefcase,       key: 'nav.services',   label: 'Services' },
+  { href: '/messages',   icon: MessageCircle,   key: 'nav.messages',   label: 'Messages' },
   { href: '/favorites',  icon: Heart,           key: 'nav.favorites' },
   { href: '/profile',    icon: User,            key: 'nav.profile' },
 ];

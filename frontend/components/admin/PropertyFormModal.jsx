@@ -11,6 +11,7 @@ const EMPTY = {
   yearBuilt: '', eligibility: 'PDS — éligible Residence Permit',
   description: '', features: [], tags: [],
   images: [], featured: false,
+  sourceUrl: '', internalNotes: '', // admin-only
 };
 
 export default function PropertyFormModal({ open, onClose, onSave, initial }) {
@@ -217,6 +218,26 @@ export default function PropertyFormModal({ open, onClose, onSave, initial }) {
             />
             <span className="text-sm font-semibold text-ink-800">Mettre en avant (featured)</span>
           </label>
+        </Section>
+
+        {/* Admin-only — hidden from public/frontend */}
+        <Section title="Champs internes (admin uniquement)">
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-3">
+            <Field label="Lien source d'origine" value={form.sourceUrl} onChange={(v) => update('sourceUrl', v)} placeholder="https://decordier-immobilier.mu/…" />
+            <div>
+              <label className="block text-xs font-semibold text-ink-700 mb-1.5">Notes internes</label>
+              <textarea
+                value={form.internalNotes}
+                onChange={(e) => update('internalNotes', e.target.value)}
+                rows={3}
+                placeholder="Notes confidentielles équipe (commission, contacts, négo…)"
+                className="w-full px-3 py-2 rounded-xl border border-ink-200 bg-white text-sm focus:border-brand-400 focus:ring-4 focus:ring-brand-100 focus:outline-none resize-none"
+              />
+            </div>
+            <p className="text-[11px] text-amber-700">
+              Ces champs ne sont jamais exposés aux utilisateurs publics, uniquement à l'équipe admin.
+            </p>
+          </div>
         </Section>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">

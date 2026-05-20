@@ -1,45 +1,65 @@
+/* Property inquiries — preserved legacy "messages" endpoint.
+   For DM chat see /api/conversations.                                  */
 import { Router } from 'express';
-import { messages, properties, users, generateId, nowIso } from '../data/store.js';
+import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { notify } from '../lib/notifications.js';
 
 const router = Router();
 
-/* POST /api/messages — authenticated user sends inquiry on a property */
-router.post('/', requireAuth, (req, res) => {
-  const { propertyId, body } = req.body || {};
-  if (!propertyId || !body) return res.status(400).json({ error: 'propertyId and body required' });
-  if (!properties.find((p) => p.id === propertyId))
-    return res.status(404).json({ error: 'Property not found' });
+router.post('/', requireAuth, async (req, res, next) => {
+  try {
+    const { propertyId, body } = req.body || {};
+    if (!propertyId || !body) return res.status(400).json({ error: 'propertyId and body required' });
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
 
-  const user = users.find((u) => u.id === req.user.sub);
-  const m = {
-    id: generateId('m'),
-    propertyId,
-    userId: user.id,
-    userName: user.name,
-    userEmail: user.email,
-    body: String(body).trim(),
-    status: 'open',
-    createdAt: nowIso(),
-  };
-  messages.unshift(m);
-  res.status(201).json({ message: m });
+    const inquiry = await prisma.inquiry.create({
+      data: {
+        propertyId, userId: user.id,
+        userName: user.name, userEmail: user.email, body: String(body).trim(),
+      },
+    });
+
+    // Mirror as a unified Lead
+    const lead = await prisma.lead.create({
+      data: {
+        type: 'property', propertyId,
+        name: user.name, email: user.email, phone: user.phone || null,
+        message: `[Demande de contact] ${String(body).trim()}`,
+        source: 'property-contact', interest: 'real-estate', status: 'new',
+      },
+    });
+
+    const admins = await prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } });
+    for (const a of admins) {
+      notify({ userId: a.id, type: 'NEW_LEAD',
+        payload: { inquiryId: inquiry.id, leadId: lead.id, propertyId, leadType: 'property', label: 'Demande de contact' } }).catch(() => {});
+    }
+    res.status(201).json({ message: inquiry, lead });
+  } catch (e) { next(e); }
 });
 
-/* GET /api/messages — admin sees all, user sees own */
-router.get('/', requireAuth, (req, res) => {
-  const result = req.user.role === 'admin'
-    ? messages.slice()
-    : messages.filter((m) => m.userId === req.user.sub);
-  res.json({ messages: result, total: result.length });
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const where = isAdmin ? {} : { userId: req.user.sub };
+    const messages = await prisma.inquiry.findMany({ where, orderBy: { createdAt: 'desc' } });
+    res.json({ messages, total: messages.length });
+  } catch (e) { next(e); }
 });
 
-/* PATCH /api/messages/:id — admin marks as answered */
-router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
-  const m = messages.find((x) => x.id === req.params.id);
-  if (!m) return res.status(404).json({ error: 'Message not found' });
-  if (req.body?.status) m.status = req.body.status;
-  res.json({ message: m });
+router.patch('/:id', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const data = {};
+    if (req.body?.status !== undefined) data.status = req.body.status;
+    const message = await prisma.inquiry.update({ where: { id: req.params.id }, data });
+    res.json({ message });
+  } catch (e) {
+    if (e.code === 'P2025') return res.status(404).json({ error: 'Message not found' });
+    next(e);
+  }
 });
 
 export default router;
