@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build || echo 'No build needed'",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "src/server.js": {
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/server.js"
+    }
+  ]
+}
