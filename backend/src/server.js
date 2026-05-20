@@ -28,34 +28,20 @@ import conversationsRoutes from './routes/conversations.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// CORS configuration for Vercel (accepts all Vercel preview URLs)
-const getAllowedOrigins = () => {
-  const envOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
-  return {
-    origin: (origin, callback) => {
-      // Allow if no origin (mobile, curl, etc)
-      if (!origin) return callback(null, true);
-      
-      // Allow if in env list
-      if (envOrigins.includes(origin)) return callback(null, true);
-      
-      // Allow all *.vercel.app domains in production
-      if (process.env.NODE_ENV === 'production' && origin.includes('vercel.app')) {
-        return callback(null, true);
-      }
-      
-      // Allow localhost in development
-      if (origin.includes('localhost')) return callback(null, true);
-      
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-  };
-};
-
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors(getAllowedOrigins()));
-app.options('*', cors(getAllowedOrigins())); // Handle preflight requests
+
+// Simple CORS that works with Vercel
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '8mb' })); // allow data-URL image uploads
 app.use(morgan('dev'));
 
