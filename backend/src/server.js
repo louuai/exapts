@@ -28,12 +28,34 @@ import conversationsRoutes from './routes/conversations.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// CORS configuration for Vercel (accepts all Vercel preview URLs)
+const getAllowedOrigins = () => {
+  const envOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
+  return {
+    origin: (origin, callback) => {
+      // Allow if no origin (mobile, curl, etc)
+      if (!origin) return callback(null, true);
+      
+      // Allow if in env list
+      if (envOrigins.includes(origin)) return callback(null, true);
+      
+      // Allow all *.vercel.app domains in production
+      if (process.env.NODE_ENV === 'production' && origin.includes('vercel.app')) {
+        return callback(null, true);
+      }
+      
+      // Allow localhost in development
+      if (origin.includes('localhost')) return callback(null, true);
+      
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  };
+};
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || '*',
-  credentials: true,
-}));
-app.options('*', cors()); // Handle preflight requests
+app.use(cors(getAllowedOrigins()));
+app.options('*', cors(getAllowedOrigins())); // Handle preflight requests
 app.use(express.json({ limit: '8mb' })); // allow data-URL image uploads
 app.use(morgan('dev'));
 
