@@ -33,6 +33,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN?.split(',') || '*',
   credentials: true,
 }));
+app.options('*', cors()); // Handle preflight requests
 app.use(express.json({ limit: '8mb' })); // allow data-URL image uploads
 app.use(morgan('dev'));
 
