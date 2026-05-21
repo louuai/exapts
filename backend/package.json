@@ -5,16 +5,16 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "start":        "node src/server.js",
-    "dev":          "nodemon src/server.js",
-    "worker":       "node src/worker.js",
-    "worker:dev":   "nodemon src/worker.js",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "worker": "node src/worker.js",
+    "worker:dev": "nodemon src/worker.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate":  "prisma migrate deploy",
-    "prisma:dev":      "prisma migrate dev",
-    "prisma:studio":   "prisma studio",
-    "db:seed":         "node prisma/seed.js",
-    "db:setup":        "prisma migrate deploy && node prisma/seed.js"
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:dev": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:seed": "node prisma/seed.js",
+    "db:setup": "prisma migrate deploy && node prisma/seed.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -30,6 +30,7 @@
     "helmet": "^7.1.0",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
     "pino-pretty": "^11.2.2",
