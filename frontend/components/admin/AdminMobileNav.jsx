@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building2, Inbox, Briefcase, Users, LineChart } from 'lucide-react';
+import { LayoutDashboard, Building2, Inbox, Briefcase, Handshake, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
@@ -9,7 +9,7 @@ const items = [
   { href: '/admin/properties', icon: Building2,       label: 'Biens' },
   { href: '/admin/leads',      icon: Inbox,           label: 'Leads' },
   { href: '/admin/services',   icon: Briefcase,       label: 'Services' },
-  { href: '/admin/users',      icon: Users,           label: 'Users' },
+  { href: '/admin/partners',   icon: Handshake,       label: 'Partners' },
   { href: '/admin/analytics',  icon: LineChart,       label: 'Stats' },
 ];
 

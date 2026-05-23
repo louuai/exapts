@@ -25,6 +25,7 @@ router.get('/', optionalAuth, async (req, res, next) => {
     const services = await prisma.service.findMany({
       where,
       orderBy: [{ subscription: 'asc' /* premium < standard alphabetically; reverse below */ }, { rating: 'desc' }],
+      include: { partner: { select: { id: true, companyName: true, name: true, avatar: true, status: true } } },
     });
     services.sort((a, b) => {
       if (a.subscription === b.subscription) return (b.rating || 0) - (a.rating || 0);
@@ -47,7 +48,10 @@ router.get('/', optionalAuth, async (req, res, next) => {
 router.get('/:id', optionalAuth, async (req, res, next) => {
   try {
     const isAdmin = req.user?.role === 'admin';
-    const s = await prisma.service.findUnique({ where: { id: req.params.id } });
+    const s = await prisma.service.findUnique({
+      where: { id: req.params.id },
+      include: { partner: { select: { id: true, companyName: true, name: true, avatar: true, status: true } } },
+    });
     if (!s) return res.status(404).json({ error: 'Service not found' });
     res.json({ service: serializeService(s, { isAdmin }) });
   } catch (e) { next(e); }
@@ -60,6 +64,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res, next) => {
     const s = await prisma.service.create({
       data: {
         name: b.name, category: b.category, description: b.description || '',
+        partnerId: b.partnerId || null,
         contact: b.contact || {}, location: b.location || '',
         rating: Number(b.rating || 0), reviews: Number(b.reviews || 0),
         subscription: b.subscription || 'standard',
@@ -75,7 +80,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res, next) => {
 
 router.put('/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const editable = ['name','category','description','contact','location','image','subscription','rating','reviews','sourceUrl','internalNotes'];
+    const editable = ['name','category','description','contact','location','image','subscription','rating','reviews','sourceUrl','internalNotes','partnerId'];
     const data = {};
     for (const k of editable) if (k in (req.body || {})) data[k] = req.body[k];
     const s = await prisma.service.update({ where: { id: req.params.id }, data });

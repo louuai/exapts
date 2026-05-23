@@ -14,6 +14,8 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   ADMIN_SESSION_SECRET: z.string().min(32).optional(),
   ADMIN_SESSION_EXPIRES_IN: z.string().default('30m'),
+  PARTNER_JWT_SECRET: z.string().min(32).optional(),
+  PARTNER_JWT_EXPIRES_IN: z.string().default('7d'),
 
   // Data layer
   DATABASE_URL:   z.string().url(),

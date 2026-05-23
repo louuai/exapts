@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Briefcase, Search, Phone, Mail, Globe, MapPin, Star, BadgeCheck, Sparkles, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -37,7 +38,9 @@ export default function ServicesPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
-      <div className="flex flex-col gap-3">
+      <div className="rounded-3xl border border-ink-100 bg-white/90 p-5 shadow-soft lg:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-brand-700">
           <Briefcase className="h-4 w-4" />
           <span className="text-xs font-bold uppercase tracking-[0.18em]">OMEGA Directory</span>
@@ -49,6 +52,14 @@ export default function ServicesPage() {
           Notaires, agents, avocats, transport, écoles… Prestataires de confiance vérifiés
           par la communauté OMEGA.
         </p>
+          </div>
+          <Link
+            href="/partner/login"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-ink-950 px-4 text-sm font-bold text-white shadow-soft transition hover:bg-ink-800"
+          >
+            Espace partenaire
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

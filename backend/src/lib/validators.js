@@ -47,6 +47,47 @@ export const schemas = {
     notificationPrefs: z.record(z.boolean()).optional(),
   }),
 
+  adminCreatePartner: z.object({
+    email:       z.string().email().max(200),
+    password:    z.string().min(8).max(200),
+    name:        trimmed(120).min(2),
+    companyName: trimmed(160).min(2),
+    phone:       trimmed(40).optional().nullable(),
+    avatar:      z.string().max(8_000_000).optional().nullable(),
+    bio:         trimmed(800).optional().nullable(),
+    location:    trimmed(120).optional().nullable(),
+    website:     z.string().url().max(300).optional().nullable(),
+    status:      z.enum(['active', 'suspended']).default('active'),
+  }),
+
+  adminUpdatePartner: z.object({
+    email:       z.string().email().max(200).optional(),
+    password:    z.string().min(8).max(200).optional(),
+    name:        trimmed(120).min(2).optional(),
+    companyName: trimmed(160).min(2).optional(),
+    phone:       trimmed(40).optional().nullable(),
+    avatar:      z.string().max(8_000_000).optional().nullable(),
+    bio:         trimmed(800).optional().nullable(),
+    location:    trimmed(120).optional().nullable(),
+    website:     z.string().url().max(300).optional().nullable(),
+    status:      z.enum(['active', 'suspended']).optional(),
+  }),
+
+  partnerLogin: z.object({
+    email:    z.string().email().max(200),
+    password: z.string().min(1).max(200),
+  }),
+
+  partnerUpdateProfile: z.object({
+    name:        trimmed(120).min(2).optional(),
+    companyName: trimmed(160).min(2).optional(),
+    phone:       trimmed(40).optional().nullable(),
+    avatar:      z.string().max(8_000_000).optional().nullable(),
+    bio:         trimmed(800).optional().nullable(),
+    location:    trimmed(120).optional().nullable(),
+    website:     z.string().url().max(300).optional().nullable(),
+  }),
+
   changePassword: z.object({
     currentPassword: z.string().min(1).max(200),
     newPassword:     z.string().min(6).max(200),

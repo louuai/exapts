@@ -129,6 +129,7 @@ enum Subscription {
 
 model Service {
   id            String       @id @default(cuid())
+  partnerId     String?
   name          String
   category      String
   description   String?
@@ -146,9 +147,37 @@ model Service {
   updatedAt     DateTime     @updatedAt
 
   leads         Lead[]
+  partner       Partner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
 
+  @@index([partnerId])
   @@index([category])
   @@index([subscription])
+}
+
+enum PartnerStatus {
+  active
+  suspended
+}
+
+model Partner {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  name          String
+  companyName   String
+  phone         String?
+  avatar        String?
+  bio           String?
+  location      String?
+  website       String?
+  status        PartnerStatus @default(active)
+  lastLoginAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  services      Service[]
+
+  @@index([status])
 }
 
 // =========================================================================

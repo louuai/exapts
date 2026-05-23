@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Users, Briefcase, Inbox, CalendarCheck, MessageSquare,
   ArrowLeft, Shield, LineChart,
+  Handshake,
 } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ const items = [
   { href: '/admin',            icon: LayoutDashboard, label: 'Vue d\'ensemble' },
   { href: '/admin/properties', icon: Building2,       label: 'Biens immobiliers' },
   { href: '/admin/services',   icon: Briefcase,       label: 'Annuaire de services' },
+  { href: '/admin/partners',   icon: Handshake,       label: 'Partenaires' },
   { href: '/admin/leads',      icon: Inbox,           label: 'Leads' },
   { href: '/admin/visits',     icon: CalendarCheck,   label: 'Demandes de visite' },
   { href: '/admin/messages',   icon: MessageSquare,   label: 'Messages' },

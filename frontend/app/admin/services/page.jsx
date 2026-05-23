@@ -8,11 +8,16 @@ import Button from '@/components/ui/Button';
 
 export default function AdminServicesPage() {
   const [list, setList] = useState(null);
+  const [partners, setPartners] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
   async function load() {
-    try { const d = await api.services(); setList(d.services); }
+    try {
+      const [d, p] = await Promise.all([api.services(), api.adminPartners()]);
+      setList(d.services);
+      setPartners(p.partners || []);
+    }
     catch { setList([]); }
   }
   useEffect(() => { load(); }, []);
@@ -47,6 +52,7 @@ export default function AdminServicesPage() {
             {r.subscription === 'premium' && <BadgeCheck className="h-3.5 w-3.5 text-amber-500" />}
           </p>
           <p className="text-xs text-ink-500">{r.location}</p>
+          {r.partner && <p className="text-[11px] font-semibold text-brand-700 mt-0.5">{r.partner.companyName}</p>}
         </div>
       </div>
     )},
@@ -109,6 +115,7 @@ export default function AdminServicesPage() {
         onClose={() => setOpen(false)}
         onSave={handleSave}
         initial={editing}
+        partners={partners}
       />
     </div>
   );

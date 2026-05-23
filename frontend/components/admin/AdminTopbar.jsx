@@ -8,6 +8,7 @@ const TITLES = {
   '/admin': 'Vue d\'ensemble',
   '/admin/properties': 'Biens immobiliers',
   '/admin/services':   'Annuaire de services',
+  '/admin/partners':   'Partenaires',
   '/admin/leads':      'Leads',
   '/admin/visits':     'Demandes de visite',
   '/admin/messages':   'Messages',

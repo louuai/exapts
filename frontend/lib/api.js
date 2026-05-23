@@ -12,13 +12,22 @@ function getAdminToken() {
   return window.localStorage.getItem('omega.adminToken');
 }
 
-async function request(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
+function getPartnerToken() {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem('omega.partnerToken');
+}
+
+async function request(path, { method = 'GET', body, auth = false, partnerAuth = false, headers = {} } = {}) {
   const finalHeaders = { 'Content-Type': 'application/json', ...headers };
   if (auth) {
     const token = getToken();
     if (token) finalHeaders.Authorization = `Bearer ${token}`;
     const adminToken = getAdminToken();
     if (adminToken) finalHeaders['X-Admin-Session'] = adminToken;
+  }
+  if (partnerAuth) {
+    const token = getPartnerToken();
+    if (token) finalHeaders.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${API_URL}${path}`, {
     method,
@@ -138,12 +147,23 @@ export const api = {
   deleteService: (id) =>
     request(`/api/services/${id}`, { method: 'DELETE', auth: true }),
 
+  // Partner portal
+  partnerLogin: (payload) => request('/api/partners/login', { method: 'POST', body: payload }),
+  partnerMe: () => request('/api/partners/me', { partnerAuth: true }),
+  partnerUpdateProfile: (payload) => request('/api/partners/me', { method: 'PATCH', body: payload, partnerAuth: true }),
+  partnerLeads: () => request('/api/partners/leads', { partnerAuth: true }),
+  partnerUpdateLead: (id, payload) => request(`/api/partners/leads/${id}`, { method: 'PATCH', body: payload, partnerAuth: true }),
+
   // Admin
   adminStats: () => request('/api/admin/stats', { auth: true }),
   adminUsers: () => request('/api/admin/users', { auth: true }),
   adminCreateUser: (payload) => request('/api/admin/users', { method: 'POST', body: payload, auth: true }),
   adminUpdateUser: (id, payload) => request(`/api/admin/users/${id}`, { method: 'PATCH', body: payload, auth: true }),
   adminDeleteUser: (id) => request(`/api/admin/users/${id}`, { method: 'DELETE', auth: true }),
+  adminPartners: () => request('/api/partners/admin', { auth: true }),
+  adminCreatePartner: (payload) => request('/api/partners/admin', { method: 'POST', body: payload, auth: true }),
+  adminUpdatePartner: (id, payload) => request(`/api/partners/admin/${id}`, { method: 'PATCH', body: payload, auth: true }),
+  adminDeletePartner: (id) => request(`/api/partners/admin/${id}`, { method: 'DELETE', auth: true }),
 };
 
 function qs(params) {

@@ -25,6 +25,7 @@ import usersRoutes         from './routes/users.js';
 import commentsRoutes      from './routes/comments.js';
 import followRoutes        from './routes/follow.js';
 import conversationsRoutes from './routes/conversations.js';
+import partnersRoutes      from './routes/partners.js';
 
 const app = express();
 const PORT = env.PORT || 4000;
@@ -84,6 +85,7 @@ app.use('/api/admin',         adminRoutes);
 app.use('/api/users',         usersRoutes);
 app.use('/api/users',         followRoutes);       // /api/users/:id/followers + /following
 app.use('/api/conversations', conversationsRoutes);
+app.use('/api/partners',      partnersRoutes);
 
 /* 404 */
 app.use((req, res) => res.status(404).json({ error: 'Not Found', path: req.originalUrl }));

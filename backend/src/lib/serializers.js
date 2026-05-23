@@ -31,8 +31,16 @@ export function serializeService(s, { isAdmin = false } = {}) {
   if (!isAdmin) {
     delete out.sourceUrl;
     delete out.internalNotes;
+    delete out.partnerId;
   }
   return out;
+}
+
+export function serializePartner(p, { includePrivate = false } = {}) {
+  if (!p) return null;
+  const { passwordHash, ...rest } = p;
+  if (!includePrivate) delete rest.email;
+  return rest;
 }
 
 /**
