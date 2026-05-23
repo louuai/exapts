@@ -13,6 +13,10 @@ import { invalidate } from '../lib/cache.js';
 const router = Router();
 const BCRYPT_ROUNDS = 10;
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+const OMEGA_STANDARD_FEE = Number(process.env.OMEGA_STANDARD_FEE || 29);
+const OMEGA_PREMIUM_FEE = Number(process.env.OMEGA_PREMIUM_FEE || 79);
+const DEFAULT_CONVERTED_VALUE = Number(process.env.PARTNER_CONVERTED_LEAD_VALUE || 250);
+const DEFAULT_CONTACTED_VALUE = Number(process.env.PARTNER_CONTACTED_LEAD_VALUE || 75);
 
 function partnerSelect() {
   return {
@@ -75,6 +79,63 @@ router.patch('/me', requirePartner, validate(schemas.partnerUpdateProfile), asyn
   } catch (e) { next(e); }
 });
 
+function cleanPartnerServicePayload(body) {
+  return {
+    name: body.name,
+    category: body.category,
+    description: body.description || '',
+    location: body.location || '',
+    image: body.image || null,
+    contact: body.contact || {},
+  };
+}
+
+router.post('/services', requirePartner, validate(schemas.partnerService), async (req, res, next) => {
+  try {
+    const data = cleanPartnerServicePayload(req.body);
+    if (data.image) data.image = await storeImage(data.image);
+    const service = await prisma.service.create({
+      data: {
+        ...data,
+        partnerId: req.partner.id,
+        subscription: 'standard',
+      },
+      include: { _count: { select: { leads: true } } },
+    });
+    await invalidate('services:*');
+    res.status(201).json({ service: serializeService(withLeadCount(service), { isAdmin: true }) });
+  } catch (e) { next(e); }
+});
+
+router.patch('/services/:id', requirePartner, validate(schemas.partnerServiceUpdate), async (req, res, next) => {
+  try {
+    const existing = await prisma.service.findFirst({ where: { id: req.params.id, partnerId: req.partner.id } });
+    if (!existing) return res.status(404).json({ error: 'Service not found' });
+    const data = {};
+    for (const key of ['name', 'category', 'description', 'location', 'contact']) {
+      if (req.body[key] !== undefined) data[key] = req.body[key] || (key === 'contact' ? {} : '');
+    }
+    if (req.body.image !== undefined) data.image = req.body.image ? await storeImage(req.body.image) : null;
+    const service = await prisma.service.update({
+      where: { id: existing.id },
+      data,
+      include: { _count: { select: { leads: true } } },
+    });
+    await invalidate('services:*');
+    res.json({ service: serializeService(withLeadCount(service), { isAdmin: true }) });
+  } catch (e) { next(e); }
+});
+
+router.delete('/services/:id', requirePartner, async (req, res, next) => {
+  try {
+    const existing = await prisma.service.findFirst({ where: { id: req.params.id, partnerId: req.partner.id } });
+    if (!existing) return res.status(404).json({ error: 'Service not found' });
+    await prisma.service.delete({ where: { id: existing.id } });
+    await invalidate('services:*');
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 router.get('/leads', requirePartner, async (req, res, next) => {
   try {
     const serviceIds = (await prisma.service.findMany({
@@ -87,6 +148,48 @@ router.get('/leads', requirePartner, async (req, res, next) => {
       include: { service: { select: { id: true, name: true, category: true } } },
     });
     res.json({ leads, total: leads.length });
+  } catch (e) { next(e); }
+});
+
+router.get('/billing', requirePartner, async (req, res, next) => {
+  try {
+    const services = await prisma.service.findMany({
+      where: { partnerId: req.partner.id },
+      select: { id: true, name: true, subscription: true },
+    });
+    const serviceIds = services.map((s) => s.id);
+    const leads = await prisma.lead.findMany({
+      where: { serviceId: { in: serviceIds } },
+      select: { status: true, createdAt: true, serviceId: true },
+    });
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const monthLeads = leads.filter((lead) => new Date(lead.createdAt).toISOString().slice(0, 7) === monthKey);
+    const premium = services.filter((service) => service.subscription === 'premium').length;
+    const standard = services.length - premium;
+    const omegaMonthlyDue = premium * OMEGA_PREMIUM_FEE + standard * OMEGA_STANDARD_FEE;
+    const converted = monthLeads.filter((lead) => lead.status === 'converted').length;
+    const contacted = monthLeads.filter((lead) => lead.status === 'contacted').length;
+    const estimatedRevenue = converted * DEFAULT_CONVERTED_VALUE + contacted * DEFAULT_CONTACTED_VALUE;
+    res.json({
+      billing: {
+        currency: 'EUR',
+        month: monthKey,
+        omegaMonthlyDue,
+        fees: {
+          standard: OMEGA_STANDARD_FEE,
+          premium: OMEGA_PREMIUM_FEE,
+        },
+        services: { total: services.length, standard, premium },
+        leads: {
+          total: leads.length,
+          month: monthLeads.length,
+          converted,
+          contacted,
+        },
+        estimatedRevenue,
+        netAfterOmega: estimatedRevenue - omegaMonthlyDue,
+      },
+    });
   } catch (e) { next(e); }
 });
 

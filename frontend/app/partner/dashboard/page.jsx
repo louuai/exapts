@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Briefcase, LogOut, Mail, Phone, Star, UsersRound } from 'lucide-react';
+import { Briefcase, Calculator, Euro, LogOut, Mail, Pencil, Phone, Plus, Star, Trash2, UsersRound, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
 
 const STATUSES = [
   { v: 'new', label: 'Nouveau' },
@@ -12,19 +14,31 @@ const STATUSES = [
   { v: 'closed', label: 'Ferme' },
 ];
 
+const EMPTY_SERVICE = {
+  name: '',
+  category: 'Service expat',
+  description: '',
+  location: '',
+  image: '',
+  contact: { phone: '', email: '', website: '' },
+};
+
 export default function PartnerDashboardPage() {
   const router = useRouter();
   const [partner, setPartner] = useState(null);
   const [services, setServices] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [serviceModal, setServiceModal] = useState(null);
 
   async function load() {
     try {
-      const [me, leadData] = await Promise.all([api.partnerMe(), api.partnerLeads()]);
+      const [me, leadData, billData] = await Promise.all([api.partnerMe(), api.partnerLeads(), api.partnerBilling()]);
       setPartner(me.partner);
       setServices(me.services || []);
       setLeads(leadData.leads || []);
+      setBilling(billData.billing || null);
     } catch {
       window.localStorage.removeItem('omega.partnerToken');
       router.replace('/partner/login');
@@ -35,15 +49,37 @@ export default function PartnerDashboardPage() {
 
   useEffect(() => { load(); }, []);
 
+  async function saveService(payload) {
+    if (serviceModal?.id) {
+      const data = await api.partnerUpdateService(serviceModal.id, payload);
+      setServices((curr) => curr.map((service) => (service.id === serviceModal.id ? data.service : service)));
+    } else {
+      const data = await api.partnerCreateService(payload);
+      setServices((curr) => [data.service, ...curr]);
+    }
+    const billData = await api.partnerBilling();
+    setBilling(billData.billing || null);
+  }
+
+  async function deleteService(id) {
+    if (!confirm('Supprimer ce service de votre annuaire ?')) return;
+    await api.partnerDeleteService(id);
+    setServices((curr) => curr.filter((service) => service.id !== id));
+    const billData = await api.partnerBilling();
+    setBilling(billData.billing || null);
+  }
+
   async function changeStatus(id, status) {
     const data = await api.partnerUpdateLead(id, { status });
     setLeads((curr) => curr.map((lead) => (lead.id === id ? data.lead : lead)));
+    const billData = await api.partnerBilling();
+    setBilling(billData.billing || null);
   }
 
   const stats = useMemo(() => ({
     leads: leads.length,
-    newLeads: leads.filter((l) => l.status === 'new').length,
-    converted: leads.filter((l) => l.status === 'converted').length,
+    newLeads: leads.filter((lead) => lead.status === 'new').length,
+    converted: leads.filter((lead) => lead.status === 'converted').length,
     services: services.length,
   }), [leads, services]);
 
@@ -71,10 +107,10 @@ export default function PartnerDashboardPage() {
         <section className="rounded-3xl bg-ink-950 p-6 text-white shadow-card lg:p-8">
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-300">Tableau de bord</p>
-              <h2 className="mt-2 font-display text-3xl font-extrabold">Clients, leads et services</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-300">Business dashboard</p>
+              <h2 className="mt-2 font-display text-3xl font-extrabold">Services, clients et revenus</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-300">
-                Consulte les demandes recues depuis l'annuaire, contacte les prospects et garde ton profil professionnel a jour.
+                Gere tes fiches annuaire comme des cartes pro, suis les leads et estime ta facturation mensuelle OMEGA.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -87,51 +123,37 @@ export default function PartnerDashboardPage() {
         </section>
 
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft lg:col-span-1">
-            <h3 className="font-display text-lg font-bold text-ink-950">Profil partenaire</h3>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-ink-100 font-bold text-ink-600">
-                {partner?.avatar ? <img src={partner.avatar} alt="" className="h-full w-full object-cover" /> : partner?.companyName?.slice(0, 2)}
-              </div>
-              <div>
-                <p className="font-semibold text-ink-950">{partner?.name}</p>
-                <p className="text-sm text-ink-500">{partner?.location || 'Localite non renseignee'}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-ink-600">{partner?.bio || 'Ajoute une bio depuis l admin pour rassurer les clients.'}</p>
-            <div className="mt-4 space-y-2 text-sm">
-              <a href={`mailto:${partner?.email}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Mail className="h-4 w-4" /> {partner?.email}</a>
-              {partner?.phone && <a href={`tel:${partner.phone}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Phone className="h-4 w-4" /> {partner.phone}</a>}
-            </div>
-          </div>
+          <ProfileCard partner={partner} />
+          <BillingCard billing={billing} />
+          <PipelineCard leads={leads} />
+        </section>
 
-          <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft lg:col-span-2">
-            <h3 className="font-display text-lg font-bold text-ink-950">Mes services annuaire</h3>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {services.map((service) => (
-                <div key={service.id} className="rounded-2xl border border-ink-100 bg-ink-50/60 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white text-ink-500">
-                      {service.image ? <img src={service.image} alt="" className="h-full w-full object-cover" /> : <Briefcase className="h-5 w-5" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-ink-950">{service.name}</p>
-                      <p className="text-xs text-ink-500">{service.category} · {service.subscription}</p>
-                      <p className="mt-2 line-clamp-2 text-sm text-ink-600">{service.description}</p>
-                    </div>
-                    {service.rating > 0 && <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {service.rating}</span>}
-                  </div>
-                </div>
-              ))}
-              {services.length === 0 && <p className="text-sm text-ink-500">Aucun service lie pour le moment.</p>}
+        <section className="rounded-3xl border border-ink-100 bg-white p-5 shadow-soft">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-display text-xl font-extrabold text-ink-950">Mes services annuaire</h3>
+              <p className="text-sm text-ink-500">Cree, modifie et garde tes fiches propres et rassurantes.</p>
             </div>
+            <Button onClick={() => setServiceModal({})}>
+              <Plus className="h-4 w-4" /> Nouveau service
+            </Button>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {services.map((service) => (
+              <ServiceCard key={service.id} service={service} onEdit={() => setServiceModal(service)} onDelete={() => deleteService(service.id)} />
+            ))}
+            {services.length === 0 && (
+              <button onClick={() => setServiceModal({})} className="rounded-2xl border border-dashed border-ink-200 bg-ink-50/50 p-8 text-center text-sm font-semibold text-ink-500 hover:bg-ink-50">
+                Ajouter votre premier service
+              </button>
+            )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-ink-100 bg-white shadow-soft">
+        <section className="rounded-3xl border border-ink-100 bg-white shadow-soft">
           <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
             <div>
-              <h3 className="font-display text-lg font-bold text-ink-950">Leads recus</h3>
+              <h3 className="font-display text-xl font-extrabold text-ink-950">Leads recus</h3>
               <p className="text-sm text-ink-500">Contact direct par email ou telephone.</p>
             </div>
             <UsersRound className="h-5 w-5 text-brand-600" />
@@ -157,6 +179,14 @@ export default function PartnerDashboardPage() {
           </div>
         </section>
       </main>
+
+      <ServiceEditor
+        open={!!serviceModal}
+        initial={serviceModal?.id ? serviceModal : null}
+        partner={partner}
+        onClose={() => setServiceModal(null)}
+        onSave={saveService}
+      />
     </div>
   );
 }
@@ -166,6 +196,188 @@ function Metric({ label, value }) {
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
       <p className="text-[10px] font-bold uppercase tracking-wider text-ink-300">{label}</p>
       <p className="mt-1 font-display text-2xl font-extrabold text-white">{value}</p>
+    </div>
+  );
+}
+
+function ProfileCard({ partner }) {
+  return (
+    <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft">
+      <h3 className="font-display text-lg font-bold text-ink-950">Profil partenaire</h3>
+      <div className="mt-4 flex items-center gap-3">
+        <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-ink-100 font-bold text-ink-600">
+          {partner?.avatar ? <img src={partner.avatar} alt="" className="h-full w-full object-cover" /> : partner?.companyName?.slice(0, 2)}
+        </div>
+        <div>
+          <p className="font-semibold text-ink-950">{partner?.name}</p>
+          <p className="text-sm text-ink-500">{partner?.location || 'Localite non renseignee'}</p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-ink-600">{partner?.bio || 'Ajoute une bio depuis l admin pour rassurer les clients.'}</p>
+      <div className="mt-4 space-y-2 text-sm">
+        <a href={`mailto:${partner?.email}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Mail className="h-4 w-4" /> {partner?.email}</a>
+        {partner?.phone && <a href={`tel:${partner.phone}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Phone className="h-4 w-4" /> {partner.phone}</a>}
+      </div>
+    </div>
+  );
+}
+
+function BillingCard({ billing }) {
+  const format = (value) => `${billing?.currency || 'EUR'} ${Number(value || 0).toLocaleString('fr-FR')}`;
+  return (
+    <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display text-lg font-bold text-ink-950">Facturation OMEGA</h3>
+        <Calculator className="h-5 w-5 text-brand-600" />
+      </div>
+      <p className="mt-4 text-3xl font-extrabold text-ink-950">{format(billing?.omegaMonthlyDue)}</p>
+      <p className="mt-1 text-sm text-ink-500">Abonnement mensuel estime · {billing?.month}</p>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+        <InfoTile label="Standard" value={`${billing?.services?.standard || 0} x ${format(billing?.fees?.standard)}`} />
+        <InfoTile label="Premium" value={`${billing?.services?.premium || 0} x ${format(billing?.fees?.premium)}`} />
+      </div>
+    </div>
+  );
+}
+
+function PipelineCard({ leads }) {
+  const total = Math.max(1, leads.length);
+  const rows = STATUSES.map((status) => ({
+    ...status,
+    count: leads.filter((lead) => lead.status === status.v).length,
+  }));
+  return (
+    <div className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display text-lg font-bold text-ink-950">Pipeline revenus</h3>
+        <Euro className="h-5 w-5 text-emerald-600" />
+      </div>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <div key={row.v}>
+            <div className="flex justify-between text-xs font-semibold text-ink-700">
+              <span>{row.label}</span>
+              <span>{row.count}</span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-ink-100">
+              <div className="h-full rounded-full bg-ink-950" style={{ width: `${Math.round((row.count / total) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InfoTile({ label, value }) {
+  return (
+    <div className="rounded-xl border border-ink-100 bg-ink-50/70 p-3">
+      <p className="font-bold uppercase tracking-wider text-ink-400">{label}</p>
+      <p className="mt-1 font-semibold text-ink-900">{value}</p>
+    </div>
+  );
+}
+
+function ServiceCard({ service, onEdit, onDelete }) {
+  return (
+    <article className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft transition hover:shadow-card">
+      <div className="relative h-36 bg-ink-100">
+        {service.image ? <img src={service.image} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-ink-300"><Briefcase className="h-8 w-8" /></div>}
+        <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-800">{service.subscription}</span>
+      </div>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-bold text-ink-950">{service.name}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">{service.category}</p>
+          </div>
+          {service.rating > 0 && <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {service.rating}</span>}
+        </div>
+        <p className="mt-3 line-clamp-3 text-sm leading-6 text-ink-600">{service.description || 'Description a completer.'}</p>
+        <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
+          <span className="text-xs text-ink-500">{service.leadsCount || 0} leads</span>
+          <div className="flex gap-1">
+            <button onClick={onEdit} className="grid h-9 w-9 place-items-center rounded-xl text-ink-600 hover:bg-ink-100"><Pencil className="h-4 w-4" /></button>
+            <button onClick={onDelete} className="grid h-9 w-9 place-items-center rounded-xl text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ServiceEditor({ open, initial, partner, onClose, onSave }) {
+  const [form, setForm] = useState(EMPTY_SERVICE);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      setForm(initial ? { ...EMPTY_SERVICE, ...initial, contact: { ...EMPTY_SERVICE.contact, ...(initial.contact || {}) } } : {
+        ...EMPTY_SERVICE,
+        contact: { ...EMPTY_SERVICE.contact, email: partner?.email || '', phone: partner?.phone || '' },
+        location: partner?.location || '',
+      });
+      setError(null);
+    }
+  }, [open, initial, partner]);
+
+  const update = (key, value) => setForm((curr) => ({ ...curr, [key]: value }));
+  const updateContact = (key, value) => setForm((curr) => ({ ...curr, contact: { ...curr.contact, [key]: value } }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(form);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={initial ? 'Modifier service' : 'Nouveau service'} subtitle="Votre fiche sera visible dans l'annuaire OMEGA." maxWidth="max-w-2xl">
+      <form onSubmit={submit} className="space-y-4">
+        {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Nom du service" required value={form.name} onChange={(value) => update('name', value)} />
+          <Field label="Categorie" required value={form.category} onChange={(value) => update('category', value)} />
+          <Field label="Localite" value={form.location || ''} onChange={(value) => update('location', value)} />
+          <Field label="Image URL" value={form.image || ''} onChange={(value) => update('image', value)} placeholder="https://" />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-ink-700">Description</label>
+          <textarea value={form.description || ''} onChange={(e) => update('description', e.target.value)} rows={4} className="w-full resize-none rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100" />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Telephone" value={form.contact.phone || ''} onChange={(value) => updateContact('phone', value)} />
+          <Field label="Email" type="email" value={form.contact.email || ''} onChange={(value) => updateContact('email', value)} />
+          <Field label="Site web" type="url" value={form.contact.website || ''} onChange={(value) => updateContact('website', value)} placeholder="https://" />
+        </div>
+        <div className="flex justify-end gap-2 border-t border-ink-100 pt-3">
+          <button type="button" onClick={onClose} className="inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-ink-700 hover:bg-ink-100"><X className="h-4 w-4" /> Annuler</button>
+          <Button type="submit" loading={saving}>Enregistrer</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function Field({ label, required, type = 'text', ...props }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-ink-700">{label} {required && <span className="text-rose-500">*</span>}</label>
+      <input
+        {...props}
+        required={required}
+        type={type}
+        onChange={(e) => props.onChange?.(e.target.value)}
+        className="h-10 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
+      />
     </div>
   );
 }

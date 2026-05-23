@@ -151,8 +151,12 @@ export const api = {
   partnerLogin: (payload) => request('/api/partners/login', { method: 'POST', body: payload }),
   partnerMe: () => request('/api/partners/me', { partnerAuth: true }),
   partnerUpdateProfile: (payload) => request('/api/partners/me', { method: 'PATCH', body: payload, partnerAuth: true }),
+  partnerCreateService: (payload) => request('/api/partners/services', { method: 'POST', body: payload, partnerAuth: true }),
+  partnerUpdateService: (id, payload) => request(`/api/partners/services/${id}`, { method: 'PATCH', body: payload, partnerAuth: true }),
+  partnerDeleteService: (id) => request(`/api/partners/services/${id}`, { method: 'DELETE', partnerAuth: true }),
   partnerLeads: () => request('/api/partners/leads', { partnerAuth: true }),
   partnerUpdateLead: (id, payload) => request(`/api/partners/leads/${id}`, { method: 'PATCH', body: payload, partnerAuth: true }),
+  partnerBilling: () => request('/api/partners/billing', { partnerAuth: true }),
 
   // Admin
   adminStats: () => request('/api/admin/stats', { auth: true }),

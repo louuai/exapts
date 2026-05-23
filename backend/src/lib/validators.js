@@ -6,6 +6,8 @@
 import { z } from 'zod';
 
 const trimmed = (max) => z.string().trim().max(max);
+const optionalUrl = z.preprocess((v) => v === '' ? undefined : v, z.string().url().max(300).optional().nullable());
+const optionalEmail = z.preprocess((v) => v === '' ? undefined : v, z.string().email().max(200).optional().nullable());
 
 export const schemas = {
   signup: z.object({
@@ -56,7 +58,7 @@ export const schemas = {
     avatar:      z.string().max(8_000_000).optional().nullable(),
     bio:         trimmed(800).optional().nullable(),
     location:    trimmed(120).optional().nullable(),
-    website:     z.string().url().max(300).optional().nullable(),
+    website:     optionalUrl,
     status:      z.enum(['active', 'suspended']).default('active'),
   }),
 
@@ -69,7 +71,7 @@ export const schemas = {
     avatar:      z.string().max(8_000_000).optional().nullable(),
     bio:         trimmed(800).optional().nullable(),
     location:    trimmed(120).optional().nullable(),
-    website:     z.string().url().max(300).optional().nullable(),
+    website:     optionalUrl,
     status:      z.enum(['active', 'suspended']).optional(),
   }),
 
@@ -85,7 +87,33 @@ export const schemas = {
     avatar:      z.string().max(8_000_000).optional().nullable(),
     bio:         trimmed(800).optional().nullable(),
     location:    trimmed(120).optional().nullable(),
-    website:     z.string().url().max(300).optional().nullable(),
+    website:     optionalUrl,
+  }),
+
+  partnerService: z.object({
+    name:        trimmed(160).min(2),
+    category:    trimmed(80).min(2),
+    description: trimmed(1200).optional().nullable(),
+    location:    trimmed(120).optional().nullable(),
+    image:       z.string().max(8_000_000).optional().nullable(),
+    contact:     z.object({
+      phone:   trimmed(40).optional().nullable(),
+      email:   optionalEmail,
+      website: optionalUrl,
+    }).optional(),
+  }),
+
+  partnerServiceUpdate: z.object({
+    name:        trimmed(160).min(2).optional(),
+    category:    trimmed(80).min(2).optional(),
+    description: trimmed(1200).optional().nullable(),
+    location:    trimmed(120).optional().nullable(),
+    image:       z.string().max(8_000_000).optional().nullable(),
+    contact:     z.object({
+      phone:   trimmed(40).optional().nullable(),
+      email:   optionalEmail,
+      website: optionalUrl,
+    }).optional(),
   }),
 
   changePassword: z.object({

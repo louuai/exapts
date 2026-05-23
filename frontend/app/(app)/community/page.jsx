@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users, TrendingUp } from 'lucide-react';
+import { Flame, MessageCircle, TrendingUp, Users } from 'lucide-react';
 import PostCard from '@/components/feature/PostCard';
 import PostComposer from '@/components/feature/PostComposer';
 import UserSearchInput from '@/components/feature/UserSearchInput';
@@ -20,16 +20,27 @@ export default function CommunityPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-brand-700">
-          <Users className="h-4 w-4" />
-          <span className="text-xs font-bold uppercase tracking-[0.18em]">OMEGA Community</span>
+      <div className="rounded-3xl border border-ink-100 bg-white/90 p-5 shadow-soft lg:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-brand-700">
+              <Users className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-[0.18em]">OMEGA Community</span>
+            </div>
+            <h1 className="mt-3 font-display font-extrabold text-3xl lg:text-4xl tracking-tight">
+              {t('community.title')}
+            </h1>
+            <p className="mt-2 text-ink-600 max-w-2xl">{t('community.subtitle')}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <SocialMetric label="Membres" value="2.4k" />
+            <SocialMetric label="Posts" value="18k" />
+            <SocialMetric label="Actifs" value="312" />
+          </div>
         </div>
-        <h1 className="font-display font-extrabold text-3xl lg:text-4xl tracking-tight">
-          {t('community.title')}
-        </h1>
-        <p className="text-ink-600 max-w-2xl">{t('community.subtitle')}</p>
       </div>
+
+      <StoryRail />
 
       {/* Search bar — find any member of the community */}
       <div className="rounded-2xl bg-white border border-ink-100 shadow-soft p-3">
@@ -99,6 +110,42 @@ export default function CommunityPage() {
             </ul>
           </div>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function SocialMetric({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-ink-100 bg-ink-50/70 px-4 py-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">{label}</p>
+      <p className="mt-1 font-display text-xl font-extrabold text-ink-950">{value}</p>
+    </div>
+  );
+}
+
+function StoryRail() {
+  const stories = [
+    ['Visa', 'Premium', 'from-brand-400 to-sky-500'],
+    ['Ecoles', 'Famille', 'from-emerald-400 to-teal-600'],
+    ['Maison', 'Achat', 'from-amber-400 to-orange-500'],
+    ['Business', 'Reseau', 'from-rose-400 to-pink-600'],
+    ['Weekend', 'Local', 'from-violet-400 to-indigo-600'],
+  ];
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-white/90 p-3 shadow-soft">
+      <div className="flex min-w-max gap-3">
+        {stories.map(([title, sub, tone]) => (
+          <button key={title} className="group w-24 text-center">
+            <span className={`mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br ${tone} p-0.5 transition group-hover:scale-105`}>
+              <span className="grid h-full w-full place-items-center rounded-full border-2 border-white bg-white/15 text-white backdrop-blur">
+                {title === 'Business' ? <MessageCircle className="h-5 w-5" /> : <Flame className="h-5 w-5" />}
+              </span>
+            </span>
+            <span className="mt-2 block text-xs font-bold text-ink-900">{title}</span>
+            <span className="block text-[10px] text-ink-500">{sub}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
