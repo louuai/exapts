@@ -19,6 +19,34 @@ export const schemas = {
     password: z.string().min(1).max(200),
   }),
 
+  adminSession: z.object({
+    password: z.string().min(1).max(200),
+  }),
+
+  adminCreateUser: z.object({
+    email:    z.string().email().max(200),
+    password: z.string().min(6).max(200),
+    name:     trimmed(120).min(2, 'Name too short'),
+    phone:    trimmed(40).optional().nullable(),
+    bio:      trimmed(500).optional().nullable(),
+    location: trimmed(120).optional().nullable(),
+    avatar:   z.string().max(8_000_000).optional().nullable(),
+    role:     z.enum(['user', 'admin']).default('user'),
+    notificationPrefs: z.record(z.boolean()).optional(),
+  }),
+
+  adminUpdateUser: z.object({
+    email:    z.string().email().max(200).optional(),
+    password: z.string().min(6).max(200).optional(),
+    name:     trimmed(120).min(2, 'Name too short').optional(),
+    phone:    trimmed(40).optional().nullable(),
+    bio:      trimmed(500).optional().nullable(),
+    location: trimmed(120).optional().nullable(),
+    avatar:   z.string().max(8_000_000).optional().nullable(),
+    role:     z.enum(['user', 'admin']).optional(),
+    notificationPrefs: z.record(z.boolean()).optional(),
+  }),
+
   changePassword: z.object({
     currentPassword: z.string().min(1).max(200),
     newPassword:     z.string().min(6).max(200),

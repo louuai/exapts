@@ -5,6 +5,7 @@
  * Jobs:
  *   - lead-followup  : auto-thank-you sent to the lead's email
  *   - notification   : generic transactional email triggered by lib/notifications.js
+ *   - user-welcome   : onboarding email after account creation
  */
 import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
@@ -54,6 +55,37 @@ function leadFollowupHtml(lead, related) {
   };
 }
 
+function welcomeUserHtml(user) {
+  const firstName = user.name?.split(' ')?.[0] || 'Bonjour';
+  return {
+    subject: 'Bienvenue sur OMEGA',
+    text:
+      `Bonjour ${firstName},\n\n` +
+      `Votre compte OMEGA est actif. Vous pouvez maintenant vous connecter avec votre email et votre mot de passe pour accéder au dashboard, à la communauté et aux favoris.\n\n` +
+      `${APP_URL}\n`,
+    html: `
+      <div style="font-family:Inter,Arial,sans-serif;color:#0f1626;max-width:560px;margin:0 auto;padding:24px">
+        <div style="background:linear-gradient(135deg,#0f172a,#0e7490);padding:24px;border-radius:18px;color:#fff">
+          <p style="margin:0 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.8">OMEGA</p>
+          <h1 style="margin:0;font-size:24px">Bienvenue ${firstName}</h1>
+          <p style="margin:10px 0 0;font-size:14px;opacity:.88">
+            Votre compte est prêt. Connectez-vous avec votre email pour accéder aux biens, messages et notifications.
+          </p>
+        </div>
+        <div style="margin-top:22px;padding:18px;background:#f7fafc;border:1px solid #e2e8f0;border-radius:14px">
+          <p style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#64748b;font-weight:700">Accès</p>
+          <p style="margin:0;font-size:14px"><strong>Email :</strong> ${user.email}</p>
+        </div>
+        <p style="margin-top:24px">
+          <a href="${APP_URL}/login" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#0f172a;color:#fff;text-decoration:none;font-weight:700">
+            Ouvrir mon espace
+          </a>
+        </p>
+      </div>
+    `,
+  };
+}
+
 export function createEmailWorker() {
   return new Worker('email', async (job) => {
     const { name, data } = job;
@@ -81,6 +113,13 @@ export function createEmailWorker() {
         html: `<p>Vous avez une nouvelle notification : <strong>${data.type}</strong></p>
                <p><a href="${APP_URL}/dashboard">Ouvrir OMEGA</a></p>`,
       });
+    }
+
+    if (name === 'user-welcome') {
+      const user = await prisma.user.findUnique({ where: { id: data.userId } });
+      if (!user) return { skipped: 'user-not-found' };
+      const tpl = welcomeUserHtml(user);
+      return sendMail({ to: user.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
     }
 
     logger.warn({ name, data }, 'email worker: unknown job');

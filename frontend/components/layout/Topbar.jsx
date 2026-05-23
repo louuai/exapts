@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, Globe, LogOut, User, ChevronDown, CheckCheck } from 'lucide-react';
+import { Bell, Globe, LogOut, User, ChevronDown, CheckCheck, Shield } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -12,7 +12,7 @@ import UserSearchInput from '@/components/feature/UserSearchInput';
 
 export default function Topbar() {
   const { locale, setLocale, t } = useI18n();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const router = useRouter();
   const [openUser, setOpenUser] = useState(false);
   const [openNotif, setOpenNotif] = useState(false);
@@ -22,7 +22,18 @@ export default function Topbar() {
 
   useEffect(() => {
     if (!user) return;
-    api.notifications().then((d) => setNotifications(d.notifications || [])).catch(() => {});
+    let active = true;
+    const load = () => api.notifications().then((d) => {
+      if (active) setNotifications(d.notifications || []);
+    }).catch(() => {});
+
+    load();
+    const timer = window.setInterval(load, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [user]);
 
   // Realtime: prepend new notifications when they arrive via socket
@@ -49,13 +60,32 @@ export default function Topbar() {
 
   const unread = notifications.filter((n) => !n.read).length;
 
+  async function toggleNotifications() {
+    const next = !openNotif;
+    setOpenNotif(next);
+    if (next && user) {
+      api.notifications().then((d) => setNotifications(d.notifications || [])).catch(() => {});
+    }
+  }
+
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/88 backdrop-blur-xl">
       <div className="flex h-16 items-center gap-3 px-4 lg:px-8">
         {/* Global user search */}
         <div className="flex-1 max-w-2xl">
           <UserSearchInput placeholder={t('nav.search.placeholder')} />
         </div>
+
+        {/* Locale switcher */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="hidden md:flex h-10 w-10 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-700 shadow-soft transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+            title="Panel admin"
+          >
+            <Shield className="h-4 w-4" />
+          </Link>
+        )}
 
         {/* Locale switcher */}
         <button
@@ -70,7 +100,7 @@ export default function Topbar() {
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
-            onClick={() => setOpenNotif((v) => !v)}
+            onClick={toggleNotifications}
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-ink-700 hover:bg-ink-100 transition"
           >
             <Bell className="h-4.5 w-4.5" />

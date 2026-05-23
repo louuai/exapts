@@ -5,6 +5,7 @@ import { api, setToken } from './api';
 const AuthContext = createContext({
   user: null,
   login: async () => {},
+  signup: async () => {},
   logout: async () => {},
   loading: true,
 });
@@ -37,6 +38,14 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const signup = useCallback(async ({ name, email, password }) => {
+    const data = await api.signup({ name, email, password });
+    await AsyncStorage.setItem('omega.token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   const logout = useCallback(async () => {
     await AsyncStorage.removeItem('omega.token');
     setToken(null);
@@ -44,7 +53,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -38,10 +38,6 @@ export default function AdminOverviewPage() {
       {/* Welcome banner */}
       <div className="rounded-3xl bg-gradient-to-br from-ink-900 via-brand-900 to-ink-900 p-6 lg:p-8 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-25 mix-blend-overlay pointer-events-none" />
-        <div
-          className="absolute -top-24 -right-24 h-72 w-72 rounded-full blur-3xl opacity-30"
-          style={{ background: 'radial-gradient(closest-side, #22d3ee, transparent)' }}
-        />
         <div className="relative max-w-2xl">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/20 px-3 py-1 text-xs font-semibold text-brand-100 backdrop-blur-sm">
             <Sparkles className="h-3 w-3" />

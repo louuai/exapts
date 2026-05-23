@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Users, Briefcase, Inbox, CalendarCheck, MessageSquare,
-  ArrowLeft, Shield,
+  ArrowLeft, Shield, LineChart,
 } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ const items = [
   { href: '/admin/visits',     icon: CalendarCheck,   label: 'Demandes de visite' },
   { href: '/admin/messages',   icon: MessageSquare,   label: 'Messages' },
   { href: '/admin/users',      icon: Users,           label: 'Utilisateurs' },
+  { href: '/admin/analytics',  icon: LineChart,       label: 'Analytics' },
 ];
 
 export default function AdminSidebar() {

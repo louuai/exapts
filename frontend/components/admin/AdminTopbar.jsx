@@ -12,6 +12,7 @@ const TITLES = {
   '/admin/visits':     'Demandes de visite',
   '/admin/messages':   'Messages',
   '/admin/users':      'Utilisateurs',
+  '/admin/analytics':  'Analytics',
 };
 
 export default function AdminTopbar() {

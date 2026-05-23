@@ -7,11 +7,18 @@ function getToken() {
   return window.localStorage.getItem('omega.token');
 }
 
+function getAdminToken() {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem('omega.adminToken');
+}
+
 async function request(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
   const finalHeaders = { 'Content-Type': 'application/json', ...headers };
   if (auth) {
     const token = getToken();
     if (token) finalHeaders.Authorization = `Bearer ${token}`;
+    const adminToken = getAdminToken();
+    if (adminToken) finalHeaders['X-Admin-Session'] = adminToken;
   }
   const res = await fetch(`${API_URL}${path}`, {
     method,
@@ -24,6 +31,12 @@ async function request(path, { method = 'GET', body, auth = false, headers = {} 
   if (!res.ok) {
     const err = new Error(data?.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.code = data?.code;
+    if (typeof window !== 'undefined' && String(data?.code || '').startsWith('ADMIN_SESSION_')) {
+      window.localStorage.removeItem('omega.adminToken');
+      window.localStorage.removeItem('omega.adminTokenExpiresAt');
+      window.dispatchEvent(new Event('omega:admin-session-expired'));
+    }
     throw err;
   }
   return data;
@@ -34,6 +47,8 @@ export const api = {
   signup: (payload) => request('/api/auth/signup', { method: 'POST', body: payload }),
   login:  (payload) => request('/api/auth/login',  { method: 'POST', body: payload }),
   me:     () => request('/api/auth/me', { auth: true }),
+  startAdminSession: (password) =>
+    request('/api/auth/admin-session', { method: 'POST', body: { password }, auth: true }),
   updateProfile: (payload) => request('/api/auth/me', { method: 'PATCH', body: payload, auth: true }),
   changePassword: (payload) =>
     request('/api/auth/change-password', { method: 'POST', body: payload, auth: true }),
@@ -126,6 +141,9 @@ export const api = {
   // Admin
   adminStats: () => request('/api/admin/stats', { auth: true }),
   adminUsers: () => request('/api/admin/users', { auth: true }),
+  adminCreateUser: (payload) => request('/api/admin/users', { method: 'POST', body: payload, auth: true }),
+  adminUpdateUser: (id, payload) => request(`/api/admin/users/${id}`, { method: 'PATCH', body: payload, auth: true }),
+  adminDeleteUser: (id) => request(`/api/admin/users/${id}`, { method: 'DELETE', auth: true }),
 };
 
 function qs(params) {

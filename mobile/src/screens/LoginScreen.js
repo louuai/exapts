@@ -8,16 +8,23 @@ import { theme } from '../lib/theme';
 import { useAuth } from '../lib/auth';
 
 export default function LoginScreen({ navigation }) {
-  const { login } = useAuth();
+  const { login, signup } = useAuth();
+  const [mode, setMode] = useState('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('demo@omega.mu');
   const [password, setPassword] = useState('demo1234');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   async function submit() {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      await login(email, password);
+      if (mode === 'signup') {
+        await signup({ name, email, password });
+      } else {
+        await login(email, password);
+      }
       navigation.replace('Tabs');
     } catch (err) {
       setError(err.message);
@@ -40,14 +47,45 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.title}>Bienvenue de retour</Text>
-          <Text style={styles.subtitle}>Connectez-vous pour retrouver votre tableau de bord.</Text>
+          <View style={styles.switcher}>
+            <TouchableOpacity
+              onPress={() => { setMode('login'); setError(null); setEmail('demo@omega.mu'); setPassword('demo1234'); }}
+              style={[styles.switchBtn, mode === 'login' && styles.switchBtnActive]}
+            >
+              <Text style={[styles.switchText, mode === 'login' && styles.switchTextActive]}>Connexion</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setMode('signup'); setError(null); setEmail(''); setPassword(''); }}
+              style={[styles.switchBtn, mode === 'signup' && styles.switchBtnActive]}
+            >
+              <Text style={[styles.switchText, mode === 'signup' && styles.switchTextActive]}>Inscription</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.title}>{mode === 'signup' ? 'Creer votre compte' : 'Bienvenue de retour'}</Text>
+          <Text style={styles.subtitle}>
+            {mode === 'signup'
+              ? 'Inscrivez-vous avec votre email pour acceder a la plateforme.'
+              : 'Connectez-vous pour retrouver votre tableau de bord.'}
+          </Text>
 
           {error && (
             <View style={styles.error}>
               <Ionicons name="alert-circle" size={16} color="#b91c1c" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
+          )}
+
+          {mode === 'signup' && (
+            <>
+              <Text style={styles.label}>Nom complet</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                style={styles.input}
+              />
+            </>
           )}
 
           <Text style={styles.label}>Email</Text>
@@ -68,12 +106,18 @@ export default function LoginScreen({ navigation }) {
           />
 
           <TouchableOpacity onPress={submit} disabled={loading} style={[styles.cta, loading && { opacity: 0.6 }]}>
-            <Text style={styles.ctaText}>{loading ? 'Connexion…' : 'Se connecter'}</Text>
+            <Text style={styles.ctaText}>
+              {loading
+                ? (mode === 'signup' ? 'Creation...' : 'Connexion...')
+                : (mode === 'signup' ? "S'inscrire avec email" : 'Se connecter')}
+            </Text>
           </TouchableOpacity>
 
-          <Text style={styles.demo}>
-            Compte de démonstration : demo@omega.mu / demo1234
-          </Text>
+          {mode === 'login' && (
+            <Text style={styles.demo}>
+              Compte de demonstration : demo@omega.mu / demo1234
+            </Text>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -91,6 +135,33 @@ const styles = StyleSheet.create({
   brand: { color: theme.colors.ink, fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
   brandSub: { color: theme.colors.muted, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', fontWeight: '600' },
   body: { flex: 1, justifyContent: 'center' },
+  switcher: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 22,
+  },
+  switchBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchBtnActive: {
+    backgroundColor: theme.colors.brandDeep,
+  },
+  switchText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.muted,
+  },
+  switchTextActive: {
+    color: '#fff',
+  },
   title: { fontSize: 28, fontWeight: '800', color: theme.colors.ink },
   subtitle: { fontSize: 14, color: theme.colors.muted, marginTop: 6, marginBottom: 24 },
   label: { fontSize: 13, fontWeight: '700', color: theme.colors.ink, marginTop: 14 },
@@ -111,6 +182,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+    marginBottom: 4,
   },
   errorText: { color: '#b91c1c', fontSize: 13 },
 });

@@ -12,6 +12,8 @@ const schema = z.object({
   // Auth
   JWT_SECRET:     z.string().min(32, 'JWT_SECRET must be at least 32 chars (use 64+ in production)'),
   JWT_EXPIRES_IN: z.string().default('7d'),
+  ADMIN_SESSION_SECRET: z.string().min(32).optional(),
+  ADMIN_SESSION_EXPIRES_IN: z.string().default('30m'),
 
   // Data layer
   DATABASE_URL:   z.string().url(),

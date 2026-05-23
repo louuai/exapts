@@ -5,7 +5,7 @@ import WhatsAppButton from '@/components/feature/WhatsAppButton';
 
 export default function AppLayout({ children }) {
   return (
-    <div className="min-h-screen flex bg-ink-50">
+    <div className="min-h-screen flex bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_38%,#eef7f6_100%)]">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />

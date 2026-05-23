@@ -13,6 +13,15 @@ export const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
 });
 
+/** Admin step-up: stricter because it verifies passwords for privileged access. */
+export const adminSessionLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin verification attempts. Please wait a few minutes.' },
+});
+
 /** Public lead capture: prevents form-spam bots from flooding the inbox. */
 export const leadLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minute

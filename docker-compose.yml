@@ -61,6 +61,8 @@ services:
       NODE_ENV: production
       JWT_SECRET: change-me-to-a-long-random-string
       JWT_EXPIRES_IN: 7d
+      ADMIN_SESSION_SECRET: change-me-to-a-second-long-random-string
+      ADMIN_SESSION_EXPIRES_IN: 30m
       CORS_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://omega:omega@postgres:5432/omega?schema=public
       REDIS_URL: redis://redis:6379
@@ -94,6 +96,7 @@ services:
       DATABASE_URL: postgresql://omega:omega@postgres:5432/omega?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: change-me-to-a-long-random-string
+      ADMIN_SESSION_SECRET: change-me-to-a-second-long-random-string
     command: ["node", "src/worker.js"]
     restart: unless-stopped
     networks:

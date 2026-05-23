@@ -36,7 +36,7 @@ export default function Sidebar() {
   const { isAdmin } = useAuth();
 
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-100 bg-white/60 backdrop-blur-sm">
+    <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-ink-100 bg-white/82 backdrop-blur-xl">
       <div className="px-6 pt-6 pb-4">
         <Link href="/dashboard"><Logo /></Link>
       </div>
@@ -51,19 +51,19 @@ export default function Sidebar() {
               className={cn(
                 'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all',
                 active
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-ink-600 hover:bg-ink-100/60 hover:text-ink-900'
+                  ? 'bg-ink-900 text-white shadow-soft'
+                  : 'text-ink-600 hover:bg-white hover:text-ink-900 hover:shadow-soft'
               )}
             >
               <Icon
                 className={cn(
                   'h-[18px] w-[18px] transition-transform group-hover:scale-110',
-                  active ? 'text-brand-600' : 'text-ink-400'
+                  active ? 'text-brand-300' : 'text-ink-400'
                 )}
               />
               {it.label || t(it.key)}
               {active && (
-                <span className="ml-auto h-2 w-2 rounded-full bg-brand-500" />
+                <span className="ml-auto h-2 w-2 rounded-full bg-brand-300" />
               )}
             </Link>
           );
@@ -88,14 +88,14 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="m-3 p-4 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 text-white">
+      <div className="m-3 p-4 rounded-2xl bg-ink-950 text-white shadow-soft">
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-100/80">
           OMEGA Premium
         </p>
         <p className="mt-1 text-sm font-semibold leading-snug">
           Service de conciergerie pour votre installation à Maurice.
         </p>
-        <button className="mt-3 text-xs font-bold text-brand-900 bg-white px-3 py-1.5 rounded-lg hover:bg-brand-50 transition">
+        <button className="mt-3 text-xs font-bold text-ink-950 bg-brand-300 px-3 py-1.5 rounded-lg hover:bg-brand-200 transition">
           En savoir plus
         </button>
       </div>

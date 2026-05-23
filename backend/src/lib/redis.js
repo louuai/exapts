@@ -1,15 +1,13 @@
 import IORedis from 'ioredis';
+import { env } from './env.js';
 
-const REDIS_URL = process.env.REDIS_URL;
-
-if (!REDIS_URL) {
-  throw new Error("REDIS_URL is not defined");
-}
+const REDIS_URL = env.REDIS_URL;
+const isTlsRedis = REDIS_URL.startsWith('rediss://') || /upstash/i.test(REDIS_URL);
 
 export const redis = new IORedis(REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
-  tls: {} // important pour Upstash
+  ...(isTlsRedis ? { tls: {} } : {}),
 });
 
 redis.on('error', (err) => console.error('[redis]', err.message));

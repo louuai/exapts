@@ -2,12 +2,13 @@ import 'dotenv/config';
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
 import { prisma } from './lib/prisma.js';
 import { initSocket } from './lib/socket.js';
+import { env } from './lib/env.js';
+import { errorHandler, forceHttps, helmetConfig } from './middleware/security.js';
 
 import authRoutes          from './routes/auth.js';
 import guidesRoutes        from './routes/guides.js';
@@ -26,22 +27,22 @@ import followRoutes        from './routes/follow.js';
 import conversationsRoutes from './routes/conversations.js';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = env.PORT || 4000;
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+if (env.TRUST_PROXY) app.set('trust proxy', 1);
+app.use(forceHttps);
+app.use(helmetConfig());
 
-// Simple CORS that works with Vercel
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('CORS origin not allowed'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Session'],
+  maxAge: 86400,
+}));
 
 app.use(express.json({ limit: '8mb' })); // allow data-URL image uploads
 app.use(morgan('dev'));
@@ -88,10 +89,7 @@ app.use('/api/conversations', conversationsRoutes);
 app.use((req, res) => res.status(404).json({ error: 'Not Found', path: req.originalUrl }));
 
 /* Error handler */
-app.use((err, _req, res, _next) => {
-  console.error('[error]', err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
-});
+app.use(errorHandler);
 
 const httpServer = http.createServer(app);
 initSocket(httpServer);

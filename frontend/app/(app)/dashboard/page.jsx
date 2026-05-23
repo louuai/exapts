@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Building2, FileCheck2, MessageCircle, Plane, Search } from 'lucide-react';
 import HeroBanner from '@/components/feature/HeroBanner';
 import GuideCard from '@/components/feature/GuideCard';
 import PostCard from '@/components/feature/PostCard';
@@ -27,6 +27,8 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-10 animate-fadeIn">
       <HeroBanner />
+
+      <SocialRail />
 
       {/* Guides */}
       <section>
@@ -104,6 +106,35 @@ export default function DashboardPage() {
         </aside>
       </section>
     </div>
+  );
+}
+
+function SocialRail() {
+  const items = [
+    { label: 'Visa', Icon: FileCheck2, href: '/guides', tone: 'bg-brand-50 text-brand-700 border-brand-100' },
+    { label: 'Logement', Icon: Building2, href: '/properties', tone: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+    { label: 'Communaute', Icon: MessageCircle, href: '/community', tone: 'bg-rose-50 text-rose-700 border-rose-100' },
+    { label: 'Services', Icon: Search, href: '/services', tone: 'bg-amber-50 text-amber-700 border-amber-100' },
+    { label: 'Arrivee', Icon: Plane, href: '/guides', tone: 'bg-sky-50 text-sky-700 border-sky-100' },
+  ];
+
+  return (
+    <section className="overflow-x-auto rounded-2xl border border-ink-100 bg-white/86 p-3 shadow-soft">
+      <div className="flex min-w-max items-center gap-3">
+        {items.map(({ label, Icon, href, tone }) => (
+          <Link
+            key={label}
+            href={href}
+            className="group flex w-28 flex-col items-center gap-2 rounded-xl px-3 py-3 text-center transition hover:bg-ink-50"
+          >
+            <span className={`grid h-14 w-14 place-items-center rounded-2xl border ${tone} transition group-hover:scale-[1.03]`}>
+              <Icon className="h-5 w-5" />
+            </span>
+            <span className="text-xs font-bold text-ink-800">{label}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 
