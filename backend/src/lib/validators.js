@@ -25,6 +25,12 @@ export const schemas = {
     password: z.string().min(1).max(200),
   }),
 
+  adminRegister: z.object({
+    email:    z.string().email().max(200),
+    password: z.string().min(6, 'Password must be at least 6 characters').max(200),
+    name:     trimmed(120).optional(),
+  }),
+
   adminCreateUser: z.object({
     email:    z.string().email().max(200),
     password: z.string().min(6).max(200),

@@ -122,6 +122,35 @@ router.post('/admin-session', requireAuth, adminSessionLimiter, validate(schemas
   } catch (e) { next(e); }
 });
 
+/* POST /api/admin/register — create first admin account (open if no admin exists) */
+router.post('/admin/register', authLimiter, validate(schemas.adminRegister), async (req, res, next) => {
+  try {
+    const adminCount = await prisma.user.count({ where: { role: 'admin' } });
+    if (adminCount > 0) return res.status(403).json({ error: 'An admin account already exists. Contact support.' });
+
+    const email = normalizeEmail(req.body.email);
+    const password = req.body.password;
+    const name = String(req.body.name || email.split('@')[0]).trim();
+
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists) return res.status(409).json({ error: 'Email already registered' });
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        role: 'admin',
+        passwordHash: bcrypt.hashSync(password, BCRYPT_ROUNDS),
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`,
+        lastLoginAt: new Date(),
+      },
+    });
+
+    logger.info({ userId: user.id, email: user.email }, 'first admin account created');
+    res.status(201).json({ token: makeToken(user), user: serializeUser(user, { includePrivate: true }) });
+  } catch (e) { next(e); }
+});
+
 /* PATCH /api/auth/me */
 router.patch('/me', requireAuth, validate(schemas.updateProfile), async (req, res, next) => {
   try {
