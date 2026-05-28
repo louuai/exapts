@@ -5,8 +5,46 @@ import { enqueue } from '../lib/queue.js';
 import { notify } from '../lib/notifications.js';
 import { leadLimiter } from '../middleware/rateLimit.js';
 import { validate, schemas } from '../lib/validators.js';
+import { scoreAndRouteLead } from '../lib/matching.js';
 
 const router = Router();
+
+function parseLeadNotes(notes) {
+  if (!notes) return { adminNotes: '', chat: [] };
+  try {
+    const parsed = JSON.parse(notes);
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.chat)) {
+      return {
+        adminNotes: typeof parsed.adminNotes === 'string' ? parsed.adminNotes : '',
+        chat: parsed.chat,
+      };
+    }
+  } catch {
+    // Legacy plain notes are preserved as admin notes.
+  }
+  return { adminNotes: String(notes), chat: [] };
+}
+
+function stringifyLeadNotes(payload) {
+  const adminNotes = payload.adminNotes || '';
+  const chat = Array.isArray(payload.chat) ? payload.chat : [];
+  if (!adminNotes && chat.length === 0) return null;
+  return JSON.stringify({ adminNotes, chat });
+}
+
+function publicLead(lead) {
+  return {
+    id: lead.id,
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    message: lead.message,
+    status: lead.status,
+    createdAt: lead.createdAt,
+    service: lead.service,
+    property: lead.property,
+  };
+}
 
 /* Coerce arbitrary input into the new unified shape and validate FK targets. */
 async function buildLeadData(body) {
@@ -85,7 +123,83 @@ router.post('/', leadLimiter, validate(schemas.createLead), async (req, res, nex
       }).catch(() => {});
     }
 
+    scoreAndRouteLead(lead.id).catch(() => {});
+
     res.status(201).json({ lead });
+  } catch (e) { next(e); }
+});
+
+router.get('/my-chats', requireAuth, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { email: true } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const leads = await prisma.lead.findMany({
+      where: { email: user.email.toLowerCase(), type: 'service' },
+      orderBy: { createdAt: 'desc' },
+      include: { service: { select: { id: true, name: true, category: true, image: true } }, leadScore: true },
+      take: 20,
+    });
+    res.json({
+      chats: leads.map((lead) => {
+        const notes = parseLeadNotes(lead.notes);
+        return { ...publicLead(lead), leadScore: lead.leadScore, messages: notes.chat, lastMessage: notes.chat.at(-1) || null };
+      }),
+    });
+  } catch (e) { next(e); }
+});
+
+/* ---------- Public lead chat, protected by matching lead email ---------- */
+router.get('/:id/chat', async (req, res, next) => {
+  try {
+    if (req.baseUrl.includes('/admin/')) return res.status(404).json({ error: 'Not Found' });
+    const email = String(req.query?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      include: {
+        property: { select: { id: true, title: true, reference: true } },
+        service:  { select: { id: true, name: true, category: true } },
+      },
+    });
+    if (!lead || lead.email.toLowerCase() !== email) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+    const notes = parseLeadNotes(lead.notes);
+    res.json({ lead: publicLead(lead), messages: notes.chat });
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/chat', leadLimiter, async (req, res, next) => {
+  try {
+    if (req.baseUrl.includes('/admin/')) return res.status(404).json({ error: 'Not Found' });
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const body = String(req.body?.body || '').trim();
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    if (!body) return res.status(400).json({ error: 'Empty message' });
+    if (body.length > 2000) return res.status(400).json({ error: 'Message too long' });
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      include: {
+        property: { select: { id: true, title: true, reference: true } },
+        service:  { select: { id: true, name: true, category: true } },
+      },
+    });
+    if (!lead || lead.email.toLowerCase() !== email) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+    const notes = parseLeadNotes(lead.notes);
+    const message = {
+      id: `leadmsg_${Date.now()}`,
+      sender: 'lead',
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    notes.chat.push(message);
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { notes: stringifyLeadNotes(notes), status: lead.status === 'new' ? 'contacted' : lead.status },
+    });
+    res.status(201).json({ lead: publicLead(lead), message, messages: notes.chat });
   } catch (e) { next(e); }
 });
 

@@ -18,6 +18,7 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState(null);
   const [facets, setFacets] = useState({});
   const [favIds, setFavIds] = useState(new Set());
+  const [matching, setMatching] = useState(null);
 
   /* Combine section + extra filters in one request */
   const queryParams = useMemo(
@@ -53,9 +54,15 @@ export default function PropertiesPage() {
     api.favorites()
       .then((d) => setFavIds(new Set(d.ids)))
       .catch(() => {});
+    api.matchingMe().then((d) => setMatching(d)).catch(() => setMatching(null));
   }, []);
 
-  const total = properties?.length || 0;
+  const matchById = useMemo(() => new Map((matching?.properties || []).map((p) => [p.id, p.matchScore || 0])), [matching]);
+  const sortedProperties = useMemo(() => {
+    if (!properties) return properties;
+    return [...properties].sort((a, b) => (matchById.get(b.id) || 0) - (matchById.get(a.id) || 0));
+  }, [properties, matchById]);
+  const total = sortedProperties?.length || 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
@@ -93,6 +100,7 @@ export default function PropertiesPage() {
 
       <div className="flex items-center justify-between text-sm text-ink-600">
         <span>
+          {matching?.score && <span className="mr-2 font-semibold text-brand-700">Personnalise {matching.score.segment}</span>}
           {properties === null ? '…' : total}{' '}
           {section === 'sale'
             ? (total > 1 ? 'biens à vendre' : 'bien à vendre')
@@ -106,15 +114,15 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {properties && total === 0 && (
+      {sortedProperties && total === 0 && (
         <div className="rounded-2xl bg-white border border-ink-100 p-12 text-center text-ink-500">
           {t('properties.empty')}
         </div>
       )}
 
-      {properties && total > 0 && (
+      {sortedProperties && total > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {properties.map((p) => (
+          {sortedProperties.map((p) => (
             <PropertyCard
               key={p.id}
               property={p}

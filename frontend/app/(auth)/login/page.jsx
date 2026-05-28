@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import Button from '@/components/ui/Button';
 import { AlertCircle, Mail, Lock } from 'lucide-react';
@@ -23,7 +24,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await login(email, password);
-      router.push('/dashboard');
+      const onboarding = await api.onboardingMe().catch(() => null);
+      router.push(onboarding?.incomplete ? '/onboarding' : '/dashboard');
     } catch (err) {
       setError(err.message);
     } finally {

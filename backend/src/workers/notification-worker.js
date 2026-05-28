@@ -35,5 +35,20 @@ export function createNotificationWorker() {
       });
       return { notified: targets.length };
     }
+    if (job.name === 'onboarding-completed') {
+      const { userId, segment } = job.data;
+      if (!userId) return { notified: 0 };
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: 'SYSTEM',
+          payload: {
+            label: 'Votre experience OMEGA est personnalisee',
+            segment,
+          },
+        },
+      });
+      return { notified: 1 };
+    }
   }, { connection, concurrency: 2 });
 }

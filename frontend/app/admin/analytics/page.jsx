@@ -5,9 +5,11 @@ import { api } from '@/lib/api';
 
 export default function AdminAnalyticsPage() {
   const [data, setData] = useState(null);
+  const [intelligence, setIntelligence] = useState(null);
 
   useEffect(() => {
     api.adminStats().then(setData).catch(() => setData({ stats: null, analytics: null }));
+    api.adminIntelligence().then(setIntelligence).catch(() => setIntelligence(null));
   }, []);
 
   if (!data) return <p className="text-ink-500">Chargement...</p>;
@@ -73,6 +75,28 @@ export default function AdminAnalyticsPage() {
             <MetricTile label="Taux d'engagement/post" value={analytics.publishing?.engagementRate || 0} />
             <MetricTile label="Notifications stockees" value={analytics.content?.notifications || 0} />
             <MetricTile label="Messages ouverts" value={stats.openMessages || 0} />
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Panel title="Intelligence segments" icon={ShieldCheck}>
+          <ShareList rows={(intelligence?.segments || []).map((row) => ({ level: row.level, count: row._count?.level || 0 }))} keyField="level" labelField="level" />
+        </Panel>
+        <Panel title="Utilisateurs haute valeur" icon={Users}>
+          <div className="space-y-3">
+            {(intelligence?.highValueUsers || []).length === 0 && <p className="text-sm text-ink-500">Aucun utilisateur haute valeur detecte.</p>}
+            {(intelligence?.highValueUsers || []).slice(0, 8).map((user) => (
+              <div key={user.id} className="flex items-center justify-between gap-3 rounded-xl bg-ink-50 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink-900">{user.name}</p>
+                  <p className="truncate text-xs text-ink-500">{user.email}</p>
+                </div>
+                <span className="rounded-full bg-ink-950 px-2 py-1 text-xs font-bold text-white">
+                  {user.leadScore?.totalScore || 0} · {user.segment?.level}
+                </span>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>

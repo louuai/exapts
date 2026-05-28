@@ -56,6 +56,14 @@ model User {
   chatMessages   ChatMessage[]
 
   notifications  Notification[]
+  onboardingProfile UserOnboardingProfile?
+  preferences        UserPreferences?
+  segment            UserSegment?
+  leadScore          LeadScore?
+  recommendations    MatchRecommendation[]
+  viewedProperties   ViewedProperty[]
+  clickedServices    ClickedService[]
+  conversionEvents   ConversionEvent[]
 
   @@index([role])
 }
@@ -111,11 +119,15 @@ model Property {
   visitRequests   VisitRequest[]
   inquiries       Inquiry[]
   leads           Lead[]
+  recommendations MatchRecommendation[]
+  viewedBy        ViewedProperty[]
 
   @@index([transaction])
   @@index([region])
   @@index([featured])
   @@index([listedAt])
+  @@index([price])
+  @@index([location])
 }
 
 // =========================================================================
@@ -148,6 +160,8 @@ model Service {
 
   leads         Lead[]
   partner       Partner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  recommendations MatchRecommendation[]
+  clickedBy        ClickedService[]
 
   @@index([partnerId])
   @@index([category])
@@ -176,8 +190,33 @@ model Partner {
   updatedAt     DateTime      @updatedAt
 
   services      Service[]
+  subscriptionTier PartnerSubscriptionTier?
+  conversionEvents ConversionEvent[]
 
   @@index([status])
+}
+
+enum PartnerTier {
+  standard
+  premium
+  vip
+}
+
+model PartnerSubscriptionTier {
+  id              String      @id @default(cuid())
+  partnerId       String      @unique
+  tier            PartnerTier @default(standard)
+  monthlyFee      Int         @default(29)
+  leadAccessLevel String      @default("LOW_VALUE,MEDIUM_VALUE")
+  features        Json        @default("{}")
+  startsAt        DateTime    @default(now())
+  expiresAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  partner         Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([tier])
 }
 
 // =========================================================================
@@ -331,6 +370,8 @@ model Lead {
 
   property    Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   service     Service?   @relation(fields: [serviceId],  references: [id], onDelete: SetNull)
+  leadScore   LeadScore?
+  conversionEvents ConversionEvent[]
 
   @@index([status])
   @@index([type])
@@ -361,8 +402,178 @@ model VisitRequest {
 
   property       Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user           User?       @relation(fields: [userId],     references: [id], onDelete: SetNull)
+  conversionEvents ConversionEvent[]
 
   @@index([status])
+}
+
+enum UserSegmentLevel {
+  LOW_VALUE
+  MEDIUM_VALUE
+  HIGH_VALUE
+  VIP
+}
+
+enum RecommendationType {
+  property
+  service
+  guide
+  community
+  partner
+}
+
+model UserOnboardingProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  completed          Boolean  @default(false)
+  currentStep        Int      @default(1)
+  intent             String?
+  budgetRange        String?
+  household          String?
+  hasKids            Boolean?
+  luxuryPreference   Boolean  @default(false)
+  lifestyleAreas     Json     @default("[]")
+  servicesNeeded     Json     @default("[]")
+  arrivalDate        DateTime?
+  duration           String?
+  contactPreferences Json     @default("[]")
+  answers            Json     @default("{}")
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([completed])
+  @@index([intent])
+  @@index([budgetRange])
+}
+
+model UserPreferences {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  propertyBudgetMin Int?
+  propertyBudgetMax Int?
+  monthlyBudgetMin  Int?
+  monthlyBudgetMax  Int?
+  preferredRegions  Json     @default("[]")
+  preferredServices Json     @default("[]")
+  preferredContent  Json     @default("[]")
+  familyProfile     Boolean  @default(false)
+  investorProfile   Boolean  @default(false)
+  luxuryProfile     Boolean  @default(false)
+  relocationStage   String?
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSegment {
+  id             String           @id @default(cuid())
+  userId         String           @unique
+  level          UserSegmentLevel @default(LOW_VALUE)
+  reason         Json             @default("[]")
+  monetizationPriority Int        @default(1)
+  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime         @default(now())
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([level])
+}
+
+model LeadScore {
+  id             String            @id @default(cuid())
+  userId         String?           @unique
+  leadId         String?           @unique
+  totalScore     Int               @default(0)
+  segment        UserSegmentLevel  @default(LOW_VALUE)
+  qualification  String            @default("LOW_VALUE")
+  priority       Int               @default(1)
+  conversionProbability Float      @default(0)
+  factors        Json              @default("[]")
+  overrideScore  Int?
+  overrideReason String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  user           User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead           Lead?             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([segment])
+  @@index([totalScore])
+}
+
+model MatchRecommendation {
+  id              String             @id @default(cuid())
+  userId          String
+  type            RecommendationType
+  propertyId      String?
+  serviceId       String?
+  guideId         String?
+  partnerId       String?
+  score           Int                @default(0)
+  reason          Json               @default("[]")
+  status          String             @default("active")
+  source          String             @default("rules-v1")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property        Property?          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  service         Service?           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, score])
+  @@index([status])
+}
+
+model ViewedProperty {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([propertyId])
+}
+
+model ClickedService {
+  id        String   @id @default(cuid())
+  userId    String
+  serviceId String
+  source    String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([serviceId])
+}
+
+model ConversionEvent {
+  id             String   @id @default(cuid())
+  userId         String?
+  leadId         String?
+  partnerId      String?
+  visitRequestId String?
+  type           String
+  value          Int?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead           Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  partner        Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  visitRequest   VisitRequest? @relation(fields: [visitRequestId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([partnerId])
+  @@index([leadId])
 }
 
 enum InquiryStatus {

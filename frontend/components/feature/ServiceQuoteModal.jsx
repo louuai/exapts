@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { CheckCircle2, AlertCircle, User, Mail, Phone, MessageSquare } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -22,6 +23,7 @@ export default function ServiceQuoteModal({ open, onClose, service }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState(null);
+  const [createdLead, setCreatedLead] = useState(null);
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -31,13 +33,14 @@ export default function ServiceQuoteModal({ open, onClose, service }) {
     setLoading(true);
     setError(null);
     try {
-      await api.createLead({
+      const data = await api.createLead({
         ...form,
         type: 'service',
         serviceId: service?.id,
         source: 'service-directory',
         interest: `service:${service?.id || 'unknown'}`,
       });
+      setCreatedLead(data.lead || null);
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -48,7 +51,7 @@ export default function ServiceQuoteModal({ open, onClose, service }) {
 
   function close() {
     onClose?.();
-    setTimeout(() => { setDone(false); setError(null); setForm({ name: user?.name || '', email: user?.email || '', phone: user?.phone || '', message: '' }); }, 300);
+    setTimeout(() => { setDone(false); setError(null); setCreatedLead(null); setForm({ name: user?.name || '', email: user?.email || '', phone: user?.phone || '', message: '' }); }, 300);
   }
 
   if (!service) return null;
@@ -69,7 +72,17 @@ export default function ServiceQuoteModal({ open, onClose, service }) {
           <p className="text-ink-700">
             Votre demande a été transmise à <strong>{service.name}</strong>. Réponse sous 24-48h ouvrées.
           </p>
-          <Button onClick={close} variant="dark" className="mt-6 rounded-full px-6">Fermer</Button>
+          <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+            {createdLead?.id && (
+              <Link
+                href={`/lead-chat/${createdLead.id}?email=${encodeURIComponent(form.email)}`}
+                className="inline-flex h-11 items-center justify-center rounded-full bg-ink-950 px-6 text-sm font-bold text-white transition hover:bg-ink-800"
+              >
+                Ouvrir le chat
+              </Link>
+            )}
+            <Button onClick={close} variant="dark" className="rounded-full px-6">Fermer</Button>
+          </div>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">

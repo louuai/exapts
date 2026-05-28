@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Briefcase, Calculator, Euro, LogOut, Mail, Pencil, Phone, Plus, Star, Trash2, UsersRound, X } from 'lucide-react';
+import { Briefcase, Calculator, Copy, Euro, LogOut, Mail, MessageSquare, Pencil, Phone, Plus, Send, Star, Trash2, UsersRound, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -31,6 +31,7 @@ export default function PartnerDashboardPage() {
   const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(true);
   const [serviceModal, setServiceModal] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   async function load() {
     try {
@@ -72,8 +73,14 @@ export default function PartnerDashboardPage() {
   async function changeStatus(id, status) {
     const data = await api.partnerUpdateLead(id, { status });
     setLeads((curr) => curr.map((lead) => (lead.id === id ? data.lead : lead)));
+    setSelectedLead((curr) => (curr?.id === id ? data.lead : curr));
     const billData = await api.partnerBilling();
     setBilling(billData.billing || null);
+  }
+
+  function updateLeadInState(lead) {
+    setLeads((curr) => curr.map((item) => (item.id === lead.id ? lead : item)));
+    setSelectedLead(lead);
   }
 
   const stats = useMemo(() => ({
@@ -160,17 +167,29 @@ export default function PartnerDashboardPage() {
           </div>
           <div className="divide-y divide-ink-100">
             {leads.map((lead) => (
-              <div key={lead.id} className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+              <div
+                key={lead.id}
+                onClick={() => setSelectedLead(lead)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') setSelectedLead(lead); }}
+                className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-ink-50/70 lg:grid-cols-[1fr_auto_auto] lg:items-center"
+              >
                 <div className="min-w-0">
                   <p className="font-semibold text-ink-950">{lead.name}</p>
                   <p className="mt-1 text-sm text-ink-500">{lead.service?.name} · {formatDate(lead.createdAt)}</p>
                   {lead.message && <p className="mt-2 line-clamp-2 text-sm text-ink-700">{lead.message}</p>}
+                  {lead.leadScore && (
+                    <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                      Score {lead.leadScore.totalScore} - {lead.leadScore.segment}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-2 text-sm">
+                <div className="flex flex-wrap gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
                   <a href={`mailto:${lead.email}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-ink-200 px-3 font-semibold text-ink-700 hover:bg-ink-50"><Mail className="h-4 w-4" /> Email</a>
                   {lead.phone && <a href={`tel:${lead.phone}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-ink-200 px-3 font-semibold text-ink-700 hover:bg-ink-50"><Phone className="h-4 w-4" /> Appel</a>}
                 </div>
-                <select value={lead.status} onChange={(e) => changeStatus(lead.id, e.target.value)} className="h-9 rounded-xl border border-ink-200 bg-white px-3 text-xs font-bold outline-none focus:ring-4 focus:ring-brand-100">
+                <select value={lead.status} onClick={(e) => e.stopPropagation()} onChange={(e) => changeStatus(lead.id, e.target.value)} className="h-9 rounded-xl border border-ink-200 bg-white px-3 text-xs font-bold outline-none focus:ring-4 focus:ring-brand-100">
                   {STATUSES.map((status) => <option key={status.v} value={status.v}>{status.label}</option>)}
                 </select>
               </div>
@@ -186,6 +205,12 @@ export default function PartnerDashboardPage() {
         partner={partner}
         onClose={() => setServiceModal(null)}
         onSave={saveService}
+      />
+      <LeadDetailModal
+        lead={selectedLead}
+        onClose={() => setSelectedLead(null)}
+        onLeadUpdated={updateLeadInState}
+        onStatusChange={changeStatus}
       />
     </div>
   );
@@ -279,8 +304,12 @@ function InfoTile({ label, value }) {
 }
 
 function ServiceCard({ service, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <article className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft transition hover:shadow-card">
+    <article
+      onClick={() => setExpanded((value) => !value)}
+      className={`cursor-pointer overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft transition hover:shadow-card ${expanded ? 'md:col-span-2 xl:col-span-2' : ''}`}
+    >
       <div className="relative h-36 bg-ink-100">
         {service.image ? <img src={service.image} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-ink-300"><Briefcase className="h-8 w-8" /></div>}
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-800">{service.subscription}</span>
@@ -294,15 +323,162 @@ function ServiceCard({ service, onEdit, onDelete }) {
           {service.rating > 0 && <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {service.rating}</span>}
         </div>
         <p className="mt-3 line-clamp-3 text-sm leading-6 text-ink-600">{service.description || 'Description a completer.'}</p>
+        {expanded && (
+          <div className="mt-4 grid gap-3 rounded-2xl border border-ink-100 bg-ink-50/70 p-4 text-sm text-ink-700 sm:grid-cols-2">
+            <InfoTile label="Localite" value={service.location || 'Non renseignee'} />
+            <InfoTile label="Categorie" value={service.category || 'Non renseignee'} />
+            <InfoTile label="Telephone" value={service.contact?.phone || 'Non renseigne'} />
+            <InfoTile label="Email" value={service.contact?.email || 'Non renseigne'} />
+            {service.contact?.website && (
+              <a href={service.contact.website} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="sm:col-span-2 rounded-xl bg-white px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50">
+                Site web: {service.contact.website}
+              </a>
+            )}
+          </div>
+        )}
         <div className="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
           <span className="text-xs text-ink-500">{service.leadsCount || 0} leads</span>
           <div className="flex gap-1">
-            <button onClick={onEdit} className="grid h-9 w-9 place-items-center rounded-xl text-ink-600 hover:bg-ink-100"><Pencil className="h-4 w-4" /></button>
-            <button onClick={onDelete} className="grid h-9 w-9 place-items-center rounded-xl text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="grid h-9 w-9 place-items-center rounded-xl text-ink-600 hover:bg-ink-100"><Pencil className="h-4 w-4" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="grid h-9 w-9 place-items-center rounded-xl text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>
           </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function LeadDetailModal({ lead, onClose, onLeadUpdated, onStatusChange }) {
+  const [messages, setMessages] = useState([]);
+  const [body, setBody] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    async function loadChat() {
+      if (!lead?.id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await api.partnerLeadChat(lead.id);
+        if (!active) return;
+        setMessages(data.messages || []);
+        if (data.lead) onLeadUpdated?.(data.lead);
+      } catch (err) {
+        if (active) setError(err.message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    setMessages(lead?.chat || []);
+    setBody('');
+    loadChat();
+    return () => { active = false; };
+  }, [lead?.id]);
+
+  if (!lead) return null;
+
+  const clientLink = typeof window === 'undefined'
+    ? ''
+    : `${window.location.origin}/lead-chat/${lead.id}?email=${encodeURIComponent(lead.email)}`;
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    if (!body.trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      const data = await api.partnerSendLeadChatMessage(lead.id, body);
+      setMessages(data.messages || []);
+      if (data.lead) onLeadUpdated?.(data.lead);
+      setBody('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function copyClientLink() {
+    try {
+      await navigator.clipboard.writeText(clientLink);
+    } catch {
+      window.prompt('Lien chat client', clientLink);
+    }
+  }
+
+  return (
+    <Modal open={!!lead} onClose={onClose} title={`Lead - ${lead.name}`} subtitle={lead.service?.name || 'Demande client'} maxWidth="max-w-4xl">
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-2xl border border-ink-100 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-display text-xl font-extrabold text-ink-950">{lead.name}</p>
+              <p className="mt-1 text-sm text-ink-500">{formatDate(lead.createdAt)}</p>
+            </div>
+            <select value={lead.status} onChange={(e) => onStatusChange?.(lead.id, e.target.value)} className="h-9 rounded-xl border border-ink-200 bg-white px-3 text-xs font-bold outline-none focus:ring-4 focus:ring-brand-100">
+              {STATUSES.map((status) => <option key={status.v} value={status.v}>{status.label}</option>)}
+            </select>
+          </div>
+          <div className="mt-4 space-y-2 text-sm">
+            <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Mail className="h-4 w-4" /> {lead.email}</a>
+            {lead.phone && <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-ink-700 hover:text-brand-700"><Phone className="h-4 w-4" /> {lead.phone}</a>}
+          </div>
+          <div className="mt-4 rounded-2xl bg-ink-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-ink-400">Besoin</p>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-800">{lead.message || 'Aucun besoin detaille.'}</p>
+          </div>
+          {lead.leadScore && (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <InfoTile label="Score" value={lead.leadScore.totalScore} />
+              <InfoTile label="Segment" value={lead.leadScore.segment} />
+              <InfoTile label="Probabilite" value={`${Math.round((lead.leadScore.conversionProbability || 0) * 100)}%`} />
+            </div>
+          )}
+          <button onClick={copyClientLink} className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-ink-200 px-3 text-sm font-bold text-ink-700 hover:bg-ink-50">
+            <Copy className="h-4 w-4" />
+            Copier le lien chat client
+          </button>
+        </section>
+
+        <section className="rounded-2xl border border-ink-100 bg-ink-50/70 p-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-display text-lg font-extrabold text-ink-950">Chat direct</h4>
+            <MessageSquare className="h-5 w-5 text-brand-600" />
+          </div>
+          <div className="mt-4 h-72 space-y-3 overflow-y-auto rounded-2xl bg-white p-3">
+            {loading && <p className="text-center text-sm text-ink-500">Chargement du chat...</p>}
+            {!loading && messages.length === 0 && (
+              <p className="rounded-xl bg-ink-50 p-3 text-sm text-ink-500">Aucun message pour le moment. Envoyez le premier message au lead.</p>
+            )}
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.sender === 'partner' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${msg.sender === 'partner' ? 'bg-ink-950 text-white' : 'bg-ink-100 text-ink-800'}`}>
+                  <p className="whitespace-pre-line">{msg.body}</p>
+                  <p className={`mt-1 text-[10px] ${msg.sender === 'partner' ? 'text-white/60' : 'text-ink-400'}`}>
+                    {msg.sender === 'partner' ? 'Vous' : lead.name} - {formatDate(msg.createdAt)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <form onSubmit={sendMessage} className="mt-3 flex gap-2">
+            <input
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Ecrire un message au lead..."
+              className="h-11 flex-1 rounded-xl border border-ink-200 bg-white px-3 text-sm outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
+            />
+            <Button type="submit" loading={sending} disabled={!body.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+          {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+        </section>
+      </div>
+    </Modal>
   );
 }
 

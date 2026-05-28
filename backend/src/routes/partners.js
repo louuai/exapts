@@ -18,9 +18,42 @@ const OMEGA_PREMIUM_FEE = Number(process.env.OMEGA_PREMIUM_FEE || 79);
 const DEFAULT_CONVERTED_VALUE = Number(process.env.PARTNER_CONVERTED_LEAD_VALUE || 250);
 const DEFAULT_CONTACTED_VALUE = Number(process.env.PARTNER_CONTACTED_LEAD_VALUE || 75);
 
+function parseLeadNotes(notes) {
+  if (!notes) return { adminNotes: '', chat: [] };
+  try {
+    const parsed = JSON.parse(notes);
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.chat)) {
+      return {
+        adminNotes: typeof parsed.adminNotes === 'string' ? parsed.adminNotes : '',
+        chat: parsed.chat,
+      };
+    }
+  } catch {
+    // Legacy plain notes are preserved as admin notes.
+  }
+  return { adminNotes: String(notes), chat: [] };
+}
+
+function stringifyLeadNotes(payload) {
+  const adminNotes = payload.adminNotes || '';
+  const chat = Array.isArray(payload.chat) ? payload.chat : [];
+  if (!adminNotes && chat.length === 0) return null;
+  return JSON.stringify({ adminNotes, chat });
+}
+
+function formatLeadForPartner(lead) {
+  const notes = parseLeadNotes(lead.notes);
+  return {
+    ...lead,
+    notes: notes.adminNotes,
+    chat: notes.chat,
+  };
+}
+
 function partnerSelect() {
   return {
     include: {
+      subscriptionTier: true,
       services: {
         orderBy: { updatedAt: 'desc' },
         include: { _count: { select: { leads: true } } },
@@ -145,9 +178,9 @@ router.get('/leads', requirePartner, async (req, res, next) => {
     const leads = await prisma.lead.findMany({
       where: { serviceId: { in: serviceIds } },
       orderBy: { createdAt: 'desc' },
-      include: { service: { select: { id: true, name: true, category: true } } },
+      include: { service: { select: { id: true, name: true, category: true } }, leadScore: true },
     });
-    res.json({ leads, total: leads.length });
+    res.json({ leads: leads.map(formatLeadForPartner), total: leads.length });
   } catch (e) { next(e); }
 });
 
@@ -210,9 +243,52 @@ router.patch('/leads/:id', requirePartner, async (req, res, next) => {
     const updated = await prisma.lead.update({
       where: { id: lead.id },
       data,
-      include: { service: { select: { id: true, name: true, category: true } } },
+      include: { service: { select: { id: true, name: true, category: true } }, leadScore: true },
     });
-    res.json({ lead: updated });
+    res.json({ lead: formatLeadForPartner(updated) });
+  } catch (e) { next(e); }
+});
+
+router.get('/leads/:id/chat', requirePartner, async (req, res, next) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, service: { partnerId: req.partner.id } },
+      include: { service: { select: { id: true, name: true, category: true } }, leadScore: true },
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    const notes = parseLeadNotes(lead.notes);
+    res.json({ lead: formatLeadForPartner(lead), messages: notes.chat });
+  } catch (e) { next(e); }
+});
+
+router.post('/leads/:id/chat', requirePartner, async (req, res, next) => {
+  try {
+    const body = String(req.body?.body || '').trim();
+    if (!body) return res.status(400).json({ error: 'Empty message' });
+    if (body.length > 2000) return res.status(400).json({ error: 'Message too long' });
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, service: { partnerId: req.partner.id } },
+      include: { service: { select: { id: true, name: true, category: true } }, leadScore: true },
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    const notes = parseLeadNotes(lead.notes);
+    const message = {
+      id: `leadmsg_${Date.now()}`,
+      sender: 'partner',
+      senderName: req.partner.companyName || req.partner.name || 'Partenaire',
+      body,
+      createdAt: new Date().toISOString(),
+    };
+    notes.chat.push(message);
+    const updated = await prisma.lead.update({
+      where: { id: lead.id },
+      data: {
+        notes: stringifyLeadNotes(notes),
+        status: lead.status === 'new' ? 'contacted' : lead.status,
+      },
+      include: { service: { select: { id: true, name: true, category: true } }, leadScore: true },
+    });
+    res.status(201).json({ lead: formatLeadForPartner(updated), message, messages: notes.chat });
   } catch (e) { next(e); }
 });
 
@@ -254,6 +330,7 @@ router.post(
           location: req.body.location || null,
           website: req.body.website || null,
           status: req.body.status || 'active',
+          subscriptionTier: { create: { tier: 'standard', monthlyFee: OMEGA_STANDARD_FEE } },
         },
         ...partnerSelect(),
       });

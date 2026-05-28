@@ -118,6 +118,9 @@ export const api = {
 
   // Leads — public capture + admin management (unified Lead model)
   createLead: (payload) => request('/api/leads', { method: 'POST', body: payload }),
+  myLeadChats: () => request('/api/leads/my-chats', { auth: true }),
+  leadChat: (id, email) => request(`/api/leads/${id}/chat${qs({ email })}`),
+  sendLeadChatMessage: (id, payload) => request(`/api/leads/${id}/chat`, { method: 'POST', body: payload }),
   // params: { type: 'property'|'service'|'general', status, q, from, to }
   leads:       (params = {}) => request(`/api/admin/leads${qs(params)}`, { auth: true }),
   adminLeads:  (params = {}) => request(`/api/admin/leads${qs(params)}`, { auth: true }),
@@ -156,6 +159,8 @@ export const api = {
   partnerDeleteService: (id) => request(`/api/partners/services/${id}`, { method: 'DELETE', partnerAuth: true }),
   partnerLeads: () => request('/api/partners/leads', { partnerAuth: true }),
   partnerUpdateLead: (id, payload) => request(`/api/partners/leads/${id}`, { method: 'PATCH', body: payload, partnerAuth: true }),
+  partnerLeadChat: (id) => request(`/api/partners/leads/${id}/chat`, { partnerAuth: true }),
+  partnerSendLeadChatMessage: (id, body) => request(`/api/partners/leads/${id}/chat`, { method: 'POST', body: { body }, partnerAuth: true }),
   partnerBilling: () => request('/api/partners/billing', { partnerAuth: true }),
 
   // Admin
@@ -168,6 +173,17 @@ export const api = {
   adminCreatePartner: (payload) => request('/api/partners/admin', { method: 'POST', body: payload, auth: true }),
   adminUpdatePartner: (id, payload) => request(`/api/partners/admin/${id}`, { method: 'PATCH', body: payload, auth: true }),
   adminDeletePartner: (id) => request(`/api/partners/admin/${id}`, { method: 'DELETE', auth: true }),
+
+  // Intelligence onboarding + matching
+  onboardingMe: () => request('/api/onboarding/me', { auth: true }),
+  saveOnboarding: (payload) => request('/api/onboarding/me', { method: 'PATCH', body: payload, auth: true }),
+  completeOnboarding: (payload) => request('/api/onboarding/complete', { method: 'POST', body: payload, auth: true }),
+  matchingMe: () => request('/api/matching/me', { auth: true }),
+  personalizedFeed: () => request('/api/matching/personalized-feed', { auth: true }),
+  trackPropertyView: (propertyId) => request('/api/matching/events/property-view', { method: 'POST', body: { propertyId }, auth: true }),
+  trackServiceClick: (serviceId, source) => request('/api/matching/events/service-click', { method: 'POST', body: { serviceId, source }, auth: true }),
+  adminIntelligence: () => request('/api/onboarding/admin/intelligence', { auth: true }),
+  adminOverrideUserScore: (id, payload) => request(`/api/onboarding/admin/users/${id}/score`, { method: 'PATCH', body: payload, auth: true }),
 };
 
 function qs(params) {

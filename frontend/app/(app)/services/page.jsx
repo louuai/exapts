@@ -13,15 +13,18 @@ export default function ServicesPage() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [quoteFor, setQuoteFor] = useState(null);
+  const [matching, setMatching] = useState(null);
 
   useEffect(() => {
     api.services()
       .then((d) => { setServices(d.services); setCategories(d.categories || []); })
       .catch(() => setServices([]));
+    api.matchingMe().then((d) => setMatching(d)).catch(() => setMatching(null));
   }, []);
 
   const filtered = useMemo(() => {
     if (!services) return null;
+    const matchById = new Map((matching?.services || []).map((service) => [service.id, service.matchScore || 0]));
     return services.filter((s) => {
       if (category && s.category !== category) return false;
       if (query) {
@@ -33,8 +36,8 @@ export default function ServicesPage() {
         );
       }
       return true;
-    });
-  }, [services, query, category]);
+    }).sort((a, b) => (matchById.get(b.id) || 0) - (matchById.get(a.id) || 0));
+  }, [services, query, category, matching]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
@@ -85,6 +88,7 @@ export default function ServicesPage() {
       </div>
 
       <p className="text-sm text-ink-600">
+        {matching?.score && <span className="mr-2 font-semibold text-brand-700">Personnalise {matching.score.segment}</span>}
         {filtered === null ? '…' : filtered.length} prestataire{(filtered?.length || 0) > 1 ? 's' : ''} disponibles
       </p>
 
@@ -174,12 +178,17 @@ function PremiumShowcase({ services, onAskQuote }) {
 }
 
 function ServiceCard({ service, index, onAskQuote }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04 }}
-      className="rounded-2xl bg-white border border-ink-100 shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col"
+      onClick={() => setExpanded((value) => !value)}
+      className={cn(
+        'cursor-pointer rounded-2xl bg-white border border-ink-100 shadow-soft hover:shadow-card transition-all overflow-hidden flex flex-col',
+        expanded && 'md:col-span-2 xl:col-span-2'
+      )}
     >
       <div className="relative h-40 bg-ink-100 overflow-hidden">
         {service.image && (
@@ -215,30 +224,51 @@ function ServiceCard({ service, index, onAskQuote }) {
             {service.reviews > 0 && <span className="ml-2">· {service.reviews} avis</span>}
           </p>
         )}
-        <p className="mt-3 text-sm text-ink-700 leading-relaxed flex-1 line-clamp-3">
+        <p className={cn('mt-3 text-sm text-ink-700 leading-relaxed flex-1', expanded ? 'line-clamp-none' : 'line-clamp-3')}>
           {service.description}
         </p>
 
+        {expanded && (
+          <div className="mt-4 grid gap-3 rounded-2xl border border-ink-100 bg-ink-50/70 p-4 text-sm sm:grid-cols-2">
+            <InfoBlock label="Categorie" value={service.category} />
+            <InfoBlock label="Localite" value={service.location || 'Non renseignee'} />
+            <InfoBlock label="Avis" value={`${service.reviews || 0} avis`} />
+            <InfoBlock label="Abonnement" value={service.subscription || 'standard'} />
+            {service.partner?.companyName && <InfoBlock label="Partenaire" value={service.partner.companyName} />}
+            {service.contact?.website && (
+              <a
+                href={service.contact.website}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-xl bg-white px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50 sm:col-span-2"
+              >
+                Ouvrir le site web
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 pt-4 border-t border-ink-100 flex flex-wrap gap-3 text-xs">
           {service.contact?.phone && (
-            <a href={`tel:${service.contact.phone}`} className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
+            <a href={`tel:${service.contact.phone}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
               <Phone className="h-3.5 w-3.5" /> {service.contact.phone}
             </a>
           )}
           {service.contact?.email && (
-            <a href={`mailto:${service.contact.email}`} className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
+            <a href={`mailto:${service.contact.email}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
               <Mail className="h-3.5 w-3.5" /> Email
             </a>
           )}
           {service.contact?.website && (
-            <a href={service.contact.website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
+            <a href={service.contact.website} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 font-semibold text-ink-700 hover:text-brand-700">
               <Globe className="h-3.5 w-3.5" /> Web
             </a>
           )}
         </div>
 
         <button
-          onClick={() => onAskQuote?.(service)}
+          onClick={(e) => { e.stopPropagation(); onAskQuote?.(service); }}
           className="mt-4 w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 text-white text-sm font-bold hover:bg-ink-800 transition"
         >
           <MessageSquare className="h-4 w-4" />
@@ -246,5 +276,14 @@ function ServiceCard({ service, index, onAskQuote }) {
         </button>
       </div>
     </motion.div>
+  );
+}
+
+function InfoBlock({ label, value }) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">{label}</p>
+      <p className="mt-1 font-semibold text-ink-900">{value}</p>
+    </div>
   );
 }
