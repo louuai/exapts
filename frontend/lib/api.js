@@ -58,6 +58,7 @@ export const api = {
   me:     () => request('/api/auth/me', { auth: true }),
   startAdminSession: (password) =>
     request('/api/auth/admin-session', { method: 'POST', body: { password }, auth: true }),
+  adminRegister: (payload) => request('/api/admin/register', { method: 'POST', body: payload }),
   updateProfile: (payload) => request('/api/auth/me', { method: 'PATCH', body: payload, auth: true }),
   changePassword: (payload) =>
     request('/api/auth/change-password', { method: 'POST', body: payload, auth: true }),
